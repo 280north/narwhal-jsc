@@ -1,57 +1,72 @@
 CPP       =g++
 CPPFLAGS  =-g -arch i386
+
+FRAMEWORKS_DIR=frameworks
+
 INCLUDES  =-Iinclude
-LIBS      =-lreadline -F. -framework JavaScriptCore
+LIBS      =-lreadline -F$(FRAMEWORKS_DIR) -framework JavaScriptCore
 MODULES   =$(patsubst %.cc,%.dylib,$(patsubst src/%,lib/%,$(wildcard src/*.cc)))
 
 SOURCE    =narwhal-jsc.c
 EXECUTABLE=bin/narwhal-jsc
 
-JSCFLAGS=-DJSCOCOA -framework JSCocoa -framework Foundation -ObjC -x objective-c
+JSCORE_FRAMEWORK=$(FRAMEWORKS_DIR)/JavaScriptCore.framework
+JSCORE_BUILD=deps/JavaScriptCore/build/Production/JavaScriptCore.framework
+JSCORE_CHECKOUT=deps/JavaScriptCore
 
-all: $(EXECUTABLE) modules
+JSCOCOA_FRAMEWORK=$(FRAMEWORKS_DIR)/JSCocoa.framework
+JSCOCOA_BUILD=deps/JSCocoa/JSCocoa/build/Release/JSCocoa.framework
+JSCOCOA_CHECKOUT=deps/JSCocoa
 
+FRAMEWORKS=$(JSCORE_FRAMEWORK) $(JSCOCOA_FRAMEWORK)
+
+all: frameworks $(EXECUTABLE) modules
+	
 $(EXECUTABLE): jsc
 	
-jsc: $(SOURCE) bin
+jsc: $(SOURCE)
+	mkdir -p `dirname $(EXECUTABLE)`
 	$(CPP) $(CPPFLAGS) $(INCLUDES) -o $(EXECUTABLE) $(SOURCE) $(LIBS)
 
-jscocoa: $(SOURCE) bin
-	$(CPP) $(CPPFLAGS) $(INCLUDES) $(JSCFLAGS) -o $(EXECUTABLE) $(SOURCE) $(LIBS)
+jscocoa: $(SOURCE)
+	mkdir -p `dirname $(EXECUTABLE)`
+	$(CPP) $(CPPFLAGS) $(INCLUDES) -DJSCOCOA -o $(EXECUTABLE) -x objective-c $(SOURCE) $(LIBS) \
+		-framework JSCocoa -framework Foundation -ObjC
 
 modules: $(MODULES)
 	
-lib/%.dylib: src/%.cc lib
+lib/%.dylib: src/%.cc
+	mkdir -p `dirname $@`
 	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< -framework JavaScriptCore
 
-frameworks: JavaScriptCore.framework JSCocoa.framework
+frameworks: $(FRAMEWORKS)
 
-JavaScriptCore.framework: deps/JavaScriptCore	
-	cd $< && xcodebuild -target JavaScriptCore
-	cp -r $</build/Production/JavaScriptCore.framework $@
-
-JSCocoa.framework: deps/JSCocoa
-	cd $</JSCocoa && xcodebuild -project "JSCocoa (embed).xcodeproj"
-	cp -r $</JSCocoa/build/Release/JSCocoa.framework $@
-
-deps/JavaScriptCore: deps
+$(JSCORE_FRAMEWORK): $(JSCORE_BUILD)
+	mkdir -p `dirname $@`
+	cp -r $< $@
+	install_name_tool -id "@loader_path/../$(FRAMEWORKS_DIR)/JavaScriptCore.framework/JavaScriptCore" $@/JavaScriptCore
+$(JSCORE_BUILD): $(JSCORE_CHECKOUT)
+	cd deps/JavaScriptCore && xcodebuild -target JavaScriptCore
+$(JSCORE_CHECKOUT):
+	mkdir -p `dirname $@`
 	svn checkout http://svn.webkit.org/repository/webkit/trunk/JavaScriptCore $@
-
-deps/JSCocoa: deps
+	
+$(JSCOCOA_FRAMEWORK): $(JSCOCOA_BUILD)
+	mkdir -p `dirname $@`
+	cp -r $< $@
+	install_name_tool -id "@loader_path/../$(FRAMEWORKS_DIR)/JSCocoa.framework/JSCocoa" $@/JSCocoa
+	install_name_tool -change "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore" "@loader_path/../$(FRAMEWORKS_DIR)/JavaScriptCore.framework/JavaScriptCore" $@/JSCocoa
+$(JSCOCOA_BUILD): $(JSCOCOA_CHECKOUT)
+	cd $(JSCOCOA_CHECKOUT)/JSCocoa && xcodebuild -project "JSCocoa (embed).xcodeproj"
+$(JSCOCOA_CHECKOUT):
+	mkdir -p `dirname $@`
 	git clone git://github.com/parmanoir/jscocoa.git $@
 
 clean:
-	rm -rf bin/narwhal-jsc* bin/*.dylib bin/*.dSYM lib/*.dylib lib/*.dSYM
+	rm -rf bin/narwhal-jsc* bin/*.dylib bin/*.dSYM lib/*.dylib lib/*.dSYM $(EXECUTABLE) $(FRAMEWORKS)
 
 cleaner: clean
 	rm -rf JavaScriptCore/build JSCocoa/JSCocoa/build
 
 pristine: clean
 	rm -rf JavaScriptCore JSCocoa
-
-bin:
-	mkdir -p $@
-lib:
-	mkdir -p $@
-deps:
-	mkdir -p $@
