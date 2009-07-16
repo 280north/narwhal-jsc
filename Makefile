@@ -65,7 +65,7 @@ $(JSCOCOA_CHECKOUT):
 	git clone git://github.com/parmanoir/jscocoa.git $@
 
 clean:
-	rm -rf bin/narwhal-jsc* bin/*.dylib bin/*.dSYM lib/*.dylib lib/*.dSYM $(EXECUTABLE) $(FRAMEWORKS)
+	rm -rf bin/narwhal-jsc* bin/*.dylib bin/*.dSYM lib/*.dylib lib/*.dSYM $(EXECUTABLE) $(JSCORE_FRAMEWORK) $(JSCOCOA_FRAMEWORK)
 
 cleaner: clean
 	rm -rf $(JSCORE_BUILD) $(JSCOCOA_BUILD)
