@@ -18,17 +18,17 @@ JSCOCOA_FRAMEWORK=$(FRAMEWORKS_DIR)/JSCocoa.framework
 JSCOCOA_BUILD=deps/JSCocoa/JSCocoa/build/Release/JSCocoa.framework
 JSCOCOA_CHECKOUT=deps/JSCocoa
 
-FRAMEWORKS=$(JSCORE_FRAMEWORK) $(JSCOCOA_FRAMEWORK)
+FRAMEWORKS=$(JSCOCOA_FRAMEWORK)
+#FRAMEWORKS+=$(JSCORE_FRAMEWORK)
 
-all: frameworks $(EXECUTABLE) modules
-	
-$(EXECUTABLE): jsc
+all: frameworks jsc modules
+jscocoa: frameworks jsc-jscocoa modules
 	
 jsc: $(SOURCE)
 	mkdir -p `dirname $(EXECUTABLE)`
 	$(CPP) $(CPPFLAGS) $(INCLUDES) -o $(EXECUTABLE) $(SOURCE) $(LIBS)
 
-jscocoa: $(SOURCE)
+jsc-jscocoa: $(SOURCE)
 	mkdir -p `dirname $(EXECUTABLE)`
 	$(CPP) $(CPPFLAGS) $(INCLUDES) -DJSCOCOA -o $(EXECUTABLE) -x objective-c $(SOURCE) $(LIBS) \
 		-framework JSCocoa -framework Foundation -ObjC
@@ -50,12 +50,14 @@ $(JSCORE_BUILD): $(JSCORE_CHECKOUT)
 $(JSCORE_CHECKOUT):
 	mkdir -p `dirname $@`
 	svn checkout http://svn.webkit.org/repository/webkit/trunk/JavaScriptCore $@
-	
+
 $(JSCOCOA_FRAMEWORK): $(JSCOCOA_BUILD)
 	mkdir -p `dirname $@`
 	cp -r $< $@
 	install_name_tool -id "@loader_path/../$(FRAMEWORKS_DIR)/JSCocoa.framework/JSCocoa" $@/JSCocoa
-	install_name_tool -change "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore" "@loader_path/../$(FRAMEWORKS_DIR)/JavaScriptCore.framework/JavaScriptCore" $@/JSCocoa
+	if [ `echo $(FRAMEWORKS) | grep "JavaScriptCore"` ]; then \
+		install_name_tool -change "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore"  "@loader_path/../$(FRAMEWORKS_DIR)/JavaScriptCore.framework/JavaScriptCore" $@/JSCocoa; \
+	fi
 $(JSCOCOA_BUILD): $(JSCOCOA_CHECKOUT)
 	cd $(JSCOCOA_CHECKOUT)/JSCocoa && xcodebuild -project "JSCocoa (embed).xcodeproj"
 $(JSCOCOA_CHECKOUT):
@@ -66,7 +68,7 @@ clean:
 	rm -rf bin/narwhal-jsc* bin/*.dylib bin/*.dSYM lib/*.dylib lib/*.dSYM $(EXECUTABLE) $(FRAMEWORKS)
 
 cleaner: clean
-	rm -rf JavaScriptCore/build JSCocoa/JSCocoa/build
+	rm -rf $(JSCORE_BUILD) $(JSCOCOA_BUILD)
 
-pristine: clean
-	rm -rf JavaScriptCore JSCocoa
+pristine: cleaner
+	rm -rf deps
