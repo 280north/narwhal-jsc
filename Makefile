@@ -1,5 +1,5 @@
 CPP       =g++
-CPPFLAGS  =-g -arch i386
+CPPFLAGS  =-g -arch i386 #-save-temps
 
 FRAMEWORKS_DIR=frameworks
 
@@ -18,8 +18,7 @@ JSCOCOA_FRAMEWORK=$(FRAMEWORKS_DIR)/JSCocoa.framework
 JSCOCOA_BUILD=deps/JSCocoa/JSCocoa/build/Release/JSCocoa.framework
 JSCOCOA_CHECKOUT=deps/JSCocoa
 
-FRAMEWORKS=$(JSCOCOA_FRAMEWORK)
-#FRAMEWORKS+=$(JSCORE_FRAMEWORK)
+FRAMEWORKS=$(JSCOCOA_FRAMEWORK) $(JSCORE_FRAMEWORK)
 
 all: frameworks jsc modules
 jscocoa: frameworks jsc-jscocoa modules
@@ -38,13 +37,14 @@ modules: $(MODULES)
 lib/%.dylib: src/%.cc
 	mkdir -p `dirname $@`
 	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< -framework JavaScriptCore
+	install_name_tool -change "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore" "@executable_path/../frameworks/JavaScriptCore.framework/JavaScriptCore" $@
 
 frameworks: $(FRAMEWORKS)
 
 $(JSCORE_FRAMEWORK): $(JSCORE_BUILD)
 	mkdir -p `dirname $@`
 	cp -r $< $@
-	install_name_tool -id "@loader_path/../$(FRAMEWORKS_DIR)/JavaScriptCore.framework/JavaScriptCore" $@/JavaScriptCore
+	install_name_tool -id "@executable_path/../$(FRAMEWORKS_DIR)/JavaScriptCore.framework/JavaScriptCore" $@/JavaScriptCore
 $(JSCORE_BUILD): $(JSCORE_CHECKOUT)
 	cd deps/JavaScriptCore && xcodebuild -target JavaScriptCore
 $(JSCORE_CHECKOUT):
@@ -55,9 +55,8 @@ $(JSCOCOA_FRAMEWORK): $(JSCOCOA_BUILD)
 	mkdir -p `dirname $@`
 	cp -r $< $@
 	install_name_tool -id "@loader_path/../$(FRAMEWORKS_DIR)/JSCocoa.framework/JSCocoa" $@/JSCocoa
-	if [ `echo $(FRAMEWORKS) | grep "JavaScriptCore"` ]; then \
-		install_name_tool -change "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore"  "@loader_path/../$(FRAMEWORKS_DIR)/JavaScriptCore.framework/JavaScriptCore" $@/JSCocoa; \
-	fi
+	install_name_tool -change "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore"  "@executable_path/../$(FRAMEWORKS_DIR)/JavaScriptCore.framework/JavaScriptCore" $@/JSCocoa;
+
 $(JSCOCOA_BUILD): $(JSCOCOA_CHECKOUT)
 	cd $(JSCOCOA_CHECKOUT)/JSCocoa && xcodebuild -project "JSCocoa (embed).xcodeproj"
 $(JSCOCOA_CHECKOUT):
@@ -65,7 +64,7 @@ $(JSCOCOA_CHECKOUT):
 	git clone git://github.com/parmanoir/jscocoa.git $@
 
 clean:
-	rm -rf bin/narwhal-jsc* bin/*.dylib bin/*.dSYM lib/*.dylib lib/*.dSYM $(EXECUTABLE) $(JSCORE_FRAMEWORK) $(JSCOCOA_FRAMEWORK)
+	rm -rf bin/narwhal-jsc* bin/*.dylib bin/*.dSYM lib/*.dylib lib/*.dSYM $(EXECUTABLE) $(JSCORE_FRAMEWORK) $(JSCOCOA_FRAMEWORK) *.o *.ii *.s
 
 cleaner: clean
 	rm -rf $(JSCORE_BUILD) $(JSCOCOA_BUILD)

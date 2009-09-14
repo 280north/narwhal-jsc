@@ -4,25 +4,18 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
+#include <narwhal.h>
+
+#include <dlfcn.h>
+
 #ifdef JSCOCOA
 #import <JSCocoa/JSCocoa.h>
 #endif
 
-JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string)
-{
-    JSStringRef jsString = JSStringCreateWithUTF8CString(string);
-    JSValueRef value = JSValueMakeString(ctx, jsString);
-    JSStringRelease(jsString);
-    return value;
-}
-
 void JSValuePrint(JSContextRef ctx, JSValueRef value, JSValueRef *exception)
 {
-    if (!exception)
-        *exception = NULL;
-    
     JSStringRef string = JSValueToStringCopy(ctx, value, exception);
-    if (exception && *exception)
+    if (!string || exception && *exception)
         return;
     
     size_t length = JSStringGetMaximumUTF8CStringSize(string);
@@ -126,33 +119,11 @@ JSValueRef Read(
     return JSValueMakeUndefined(context);
 }
 
-JSValueRef IsFile(
-    JSContextRef context,
-    JSObjectRef function,
-    JSObjectRef thisObject,
-    size_t argumentCount,
-    const JSValueRef arguments[],
-    JSValueRef *exception)
+FUNCTION(IsFile)
 {
-    if (argumentCount == 0) {
-        *exception = JSValueMakeStringWithUTF8CString(context, "isFile() takes one argument");
-        return JSValueMakeUndefined(context);
-    }
+    ARG_COUNT(1);
     
-    JSStringRef string = JSValueToStringCopy(context, arguments[0], exception);
-    if (*exception) {
-        return JSValueMakeUndefined(context);
-    }
-    
-    size_t length = JSStringGetMaximumUTF8CStringSize(string);
-    char *buffer = (char*)malloc(length);
-    if (!buffer) {
-        *exception = JSValueMakeStringWithUTF8CString(context, "isFile() error occurred");
-        return JSValueMakeUndefined(context);
-    }
-        
-    JSStringGetUTF8CString(string, buffer, length);
-    JSStringRelease(string);
+    ARG_utf8(buffer, 0);
     
 	struct stat stat_info;
     int ret = stat(buffer, &stat_info);
@@ -161,6 +132,48 @@ JSValueRef IsFile(
     
     return JSValueMakeBoolean(context, ret != -1 && S_ISREG(stat_info.st_mode));
 }
+END
+
+typedef JSValueRef (*factory_t)(JSContextRef context,\
+    JSObjectRef function,\
+    JSObjectRef thisObject,\
+    size_t argumentCount,\
+    const JSValueRef arguments[],\
+    JSValueRef *exception);
+typedef const char *(*getModuleName_t)(void);
+
+FUNCTION(RequireNative)
+{
+	ARG_COUNT(2)
+	ARG_utf8(topId,0);
+    ARG_utf8(path,1);
+    
+    printf("RequireNative! [%s] [%s] \n", topId, path);
+    
+    void *handle = dlopen(path, RTLD_LOCAL | RTLD_LAZY);
+    //printf("handle=%p\n", handle);
+    if (handle == NULL) {
+        printf("dlopen error: %s\n", dlerror());
+    	return JS_null;
+    }
+    
+    getModuleName_t getModuleName = (getModuleName_t)dlsym(handle, "getModuleName");
+    if (getModuleName == NULL) {
+        printf("dlsym (getModuleName) error: %s\n", dlerror());
+    	return JS_null;
+    }
+    printf("getModuleName=%p moduleName=%s\n", getModuleName, getModuleName());
+    
+    factory_t func = (factory_t)dlsym(handle, getModuleName());
+    //printf("func=%p\n", func);
+    if (func == NULL) {
+        printf("dlsym (%s) error: %s\n", getModuleName, dlerror());
+    	return JS_null;
+    }
+    
+    return JS_fn(func);
+}
+END
 
 JSObjectRef envpToObject(JSGlobalContextRef context, char *envp[])
 {
@@ -301,6 +314,16 @@ int main(int argc, char *argv[], char *envp[])
         return 1;
     }
     
+    // requireNative
+    propertyName = JSStringCreateWithUTF8CString("requireNative");
+    value = JSObjectMakeFunctionWithCallback(context, propertyName, RequireNative);
+    JSObjectSetProperty(context, global, propertyName, value, kJSPropertyAttributeNone, &exception);
+    JSStringRelease(propertyName);
+    if (exception) {
+        JSValuePrint(context, exception, NULL);
+        return 1;
+    }
+    
     // ARGS
     value = argvToArray(context, argc, argv);
     if (value) {
@@ -331,7 +354,7 @@ int main(int argc, char *argv[], char *envp[])
     
     // Load bootstrap.js
     char buffer[1024];
-    snprintf(buffer, sizeof(buffer), "%s/bootstrap.js", getenv("NARWHAL_PLATFORM_HOME"));
+    snprintf(buffer, sizeof(buffer), "%s/bootstrap.js", getenv("NARWHAL_ENGINE_HOME"));
     JSStringRef source = ReadFile(buffer);
     if (!source) {
         printf("Error reading bootstrap.js\n");

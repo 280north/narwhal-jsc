@@ -2,6 +2,7 @@
     var debug = true;
 
     var prefix = ENV['NARWHAL_HOME'];
+    var enginePrefix = ENV['NARWHAL_ENGINE_HOME'];
 
     var _isFile = isFile, _read = read, _print = print;
     delete read, isFile, print;
@@ -24,11 +25,15 @@
         return loader;
     };
 
-    eval(_read(prefix + "/narwhal.js"))({
+    var narwhal = eval(_read(prefix + "/narwhal.js"));
+    
+    narwhal({
         global: global,
         evalGlobal: evalGlobal,
-        platform: 'jsc',
-        platforms: ['jsc', 'c', 'default'],
+        engine: 'jsc',
+        engines: ['jsc', 'c', 'default'],
+        prefix: prefix,
+        prefixes: [enginePrefix, prefix],
         debug: debug,
         print: function (string) { _print(String(string)); },
         evaluate: function (text) {
@@ -38,8 +43,10 @@
             read: function(path) { return _read(path); },
             isFile: function(path) { return _isFile(path); }
         },
-        prefix: prefix,
-        loaders: [[".dylib", NativeLoader()]]
+        loaders: [[".dylib", NativeLoader()]],
+        os : "darwin",
+        debug: true,
+        verbose: true
     });
 
 })(function () {
