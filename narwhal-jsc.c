@@ -123,7 +123,7 @@ FUNCTION(IsFile)
 {
     ARG_COUNT(1);
     
-    ARG_utf8(buffer, 0);
+    ARGN_UTF8(buffer, 0);
     
 	struct stat stat_info;
     int ret = stat(buffer, &stat_info);
@@ -145,8 +145,8 @@ typedef const char *(*getModuleName_t)(void);
 FUNCTION(RequireNative)
 {
 	ARG_COUNT(2)
-	ARG_utf8(topId,0);
-    ARG_utf8(path,1);
+	ARGN_UTF8(topId,0);
+    ARGN_UTF8(path,1);
     
     printf("RequireNative! [%s] [%s] \n", topId, path);
     

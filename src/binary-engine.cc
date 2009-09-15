@@ -47,7 +47,7 @@ JSObjectRef Bytes_new(JSContextRef context, unsigned char* buffer, unsigned int 
     return JSObjectMake(context, Bytes_class(context), data);
 }
 
-FUNCTION(B_ALLOC, PINT(length))
+FUNCTION(B_ALLOC, ARG_INT(length))
 {
     unsigned char *buffer = (unsigned char*)calloc(length, sizeof(char));
     if (!buffer)
@@ -57,14 +57,14 @@ FUNCTION(B_ALLOC, PINT(length))
 }
 END
 
-FUNCTION(B_LENGTH, POBJ(bytes))
+FUNCTION(B_LENGTH, ARG_OBJ(bytes))
 {
     GET_INTERNAL(BytesPrivate*, byte_data, bytes);
     return JS_int(byte_data->length);
 }
 END
 
-FUNCTION(B_FILL, POBJ(bytes), PINT(from), PINT(to), PINT(value))
+FUNCTION(B_FILL, ARG_OBJ(bytes), ARG_INT(from), ARG_INT(to), ARG_INT(value))
 {
     GET_INTERNAL(BytesPrivate*, byte_data, bytes);
     
@@ -80,7 +80,7 @@ FUNCTION(B_FILL, POBJ(bytes), PINT(from), PINT(to), PINT(value))
 }
 END
 
-FUNCTION(B_COPY, POBJ(src), PINT(srcOffset), POBJ(dst), PINT(dstOffset), PINT(length))
+FUNCTION(B_COPY, ARG_OBJ(src), ARG_INT(srcOffset), ARG_OBJ(dst), ARG_INT(dstOffset), ARG_INT(length))
 {
     GET_INTERNAL(BytesPrivate*, src_data, src);
     GET_INTERNAL(BytesPrivate*, dst_data, dst);
@@ -94,7 +94,7 @@ FUNCTION(B_COPY, POBJ(src), PINT(srcOffset), POBJ(dst), PINT(dstOffset), PINT(le
 }
 END
 
-FUNCTION(B_GET, POBJ(bytes), PINT(index))
+FUNCTION(B_GET, ARG_OBJ(bytes), ARG_INT(index))
 {
     GET_INTERNAL(BytesPrivate*, bytes_data, bytes);
     
@@ -109,7 +109,7 @@ FUNCTION(B_GET, POBJ(bytes), PINT(index))
 }
 END
 
-FUNCTION(B_SET, POBJ(bytes), PINT(index), PINT(value))
+FUNCTION(B_SET, ARG_OBJ(bytes), ARG_INT(index), ARG_INT(value))
 {
     GET_INTERNAL(BytesPrivate*, bytes_data, bytes);
     
@@ -124,14 +124,14 @@ FUNCTION(B_SET, POBJ(bytes), PINT(index), PINT(value))
 }
 END
 
-FUNCTION(B_DECODE_DEFAULT, POBJ(bytes), PINT(offset), PINT(length))
+FUNCTION(B_DECODE_DEFAULT, ARG_OBJ(bytes), ARG_INT(offset), ARG_INT(length))
 {
     GET_INTERNAL(BytesPrivate*, bytes_data, bytes);
     return JS_str_utf8((char *)(bytes_data->buffer + offset), length);
 }
 END
 
-FUNCTION(B_ENCODE_DEFAULT, PUTF8(string))
+FUNCTION(B_ENCODE_DEFAULT, ARG_UTF8(string))
 {
     int length = strlen(string);
     
@@ -145,7 +145,7 @@ FUNCTION(B_ENCODE_DEFAULT, PUTF8(string))
 }
 END
 
-FUNCTION(B_TRANSCODE, POBJ(src), PINT(offset), PINT(length), PSTR(sourceCodec), PSTR(targetCodec))
+FUNCTION(B_TRANSCODE, ARG_OBJ(src), ARG_INT(offset), ARG_INT(length), ARG_UTF8(sourceCodec), ARG_UTF8(targetCodec))
 {
     GET_INTERNAL(BytesPrivate*, src_data, src);
     

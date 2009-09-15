@@ -9,7 +9,7 @@ FUNCTION(Exit)
     }
     else if (ARGC == 1)
     {
-        ARG_int(code, 0);
+        ARGN_INT(code, 0);
         exit(code);
     }
     

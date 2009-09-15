@@ -14,41 +14,43 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
 #define STRINGIZE2(s) #s
 #define STRINGIZE(s) STRINGIZE2(s)
 
-#define THIS thisObject
+#define THIS _this
 
-#define ARGC argumentCount
+#define ARGC _argc
+#define ARGV(index) _argv[index]
 #define ARG_COUNT(c) if ( ARGC != c ) { THROW("Insufficient arguments"); }
 
-#define THROW(str) \
-    {*exception = JSValueMakeStringWithUTF8CString(context, str);\
-    return JSValueMakeUndefined(context);}
+#define ARGN_INT(variable, index) \
+    int variable = (int)JSValueToNumber(context, ARGV(index), _exception); \
+    if (*_exception) { return JS_undefined; };
 
-#define ARG_obj(variable, index) \
-    JSObjectRef variable = JSValueToObject(context, arguments[index], exception); \
-    if (*exception) { return JS_undefined; };
+#define ARGN_OBJ(variable, index) \
+    JSObjectRef variable = JSValueToObject(context, ARGV(index), _exception); \
+    if (*_exception) { return JS_undefined; };
     
-#define ARG_fn(variable, index) \
-    ARG_obj(variable, index); \
+#define ARGN_FN(variable, index) \
+    ARGN_OBJ(variable, index); \
     if (!JSObjectIsFunction(context, variable)) { THROW("Argument index must be a function."); }
-    
-#define ARG_int(variable, index) \
-    int variable = (int)JSValueToNumber(context, arguments[index], exception); \
-    if (*exception) { return JS_undefined; };
 
-#define ARG_utf8(variable, index) \
+#define ARGN_STR(variable, index) \
+    JSStringRef variable = JSValueToStringCopy(context, ARGV(index), _exception);\
+    if (*_exception) { return JS_undefined; }
+
+#define ARGN_UTF8(variable, index) \
     char *variable = NULL;\
-    {JSStringRef jsStr = JSValueToStringCopy(context, arguments[index], exception);\
-    if (*exception) { return JS_undefined; }\
+    {JSStringRef jsStr = JSValueToStringCopy(context, ARGV(index), _exception);\
+    if (*_exception) { return JS_undefined; }\
     size_t len = JSStringGetMaximumUTF8CStringSize(jsStr);\
     variable = (char*)malloc(len);\
     if (!variable) { JSStringRelease(jsStr); THROW("OOM"); }\
     JSStringGetUTF8CString(jsStr, variable, len);\
     JSStringRelease(jsStr);}
 
-#define PINT(variable)  0; ARG_int(variable, _argn++); 0
-#define POBJ(variable)  0; ARG_obj(variable, _argn++); 0
-#define PUTF8(variable)  0; ARG_utf8(variable, _argn++); 0
-#define PSTR(variable)  0; ARG_utf8(variable, _argn++); 0
+#define ARG_INT(variable)  0; ARGN_INT(variable, _argn++); 0
+#define ARG_OBJ(variable)  0; ARGN_OBJ(variable, _argn++); 0
+#define ARG_FN(variable)   0; ARGN_FNvariable, _argn++); 0
+#define ARG_STR(variable)  0; ARGN_STR(variable, _argn++); 0
+#define ARG_UTF8(variable) 0; ARGN_UTF8(variable, _argn++); 0
 
 #define JS_undefined    JSValueMakeUndefined(context)
 #define JS_null         JSValueMakeNull(context)
@@ -59,21 +61,21 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
 #define JS_str_ref(str) JSStringCreateWithUTF8CString(str)
 
 #define OBJECT_GET(object, name) \
-    JSObjectGetProperty(context, object, JS_str_ref(name), exception) 
+    JSObjectGetProperty(context, object, JS_str_ref(name), _exception) 
 
 #define OBJECT_SET(object, name, value) \
-    {JSObjectSetProperty(context, object, JS_str_ref(name), value, kJSPropertyAttributeNone, exception); \
-    if (*exception) { return JS_undefined; }}
+    {JSObjectSetProperty(context, object, JS_str_ref(name), value, kJSPropertyAttributeNone, _exception); \
+    if (*_exception) { return JS_undefined; }}
 
 #define EXPORTS(name, object) OBJECT_SET(Exports, name, object);
 
 #define FUNC_HEADER(f) JSValueRef f( \
     JSContextRef ctx, \
     JSObjectRef function, \
-    JSObjectRef thisObject, \
-    size_t argumentCount, \
-    const JSValueRef arguments[], \
-    JSValueRef *exception) \
+    JSObjectRef _this, \
+    size_t _argc, \
+    const JSValueRef _argv[], \
+    JSValueRef *_exception) \
     
 #define FUNCTION(f,...) FUNC_HEADER(f) \
     { JSContextRef context = ctx; \
@@ -83,9 +85,9 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
 #define CONSTRUCTOR(f) JSObjectRef f( \
     JSContextRef context, \
     JSObjectRef constructor, \
-    size_t argc, \
-    const JSValueRef argv[], \
-    JSValueRef* exception) \
+    size_t _argc, \
+    const JSValueRef _argv[], \
+    JSValueRef* _exception) \
     { \
 
 #define END \
@@ -115,17 +117,17 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
     extern "C" FUNC_HEADER(MODULE_NAME) \
         { context = ctx; \
         ARG_COUNT(5); \
-        Require = JSValueToObject(context, arguments[0], exception); \
-        if (*exception) { return JS_undefined; }; \
+        Require = JSValueToObject(context, ARGV(0), _exception); \
+        if (*_exception) { return JS_undefined; }; \
         if (!JSObjectIsFunction(context, Require)) { THROW("Argument 0 must be a function."); } \
-        Exports = JSValueToObject(context, arguments[1], exception); \
-        if (*exception) { return JS_undefined; }; \
-        Module = JSValueToObject(context, arguments[2], exception); \
-        if (*exception) { return JS_undefined; }; \
-        System = JSValueToObject(context, arguments[3], exception); \
-        if (*exception) { return JS_undefined; }; \
-        Print = JSValueToObject(context, arguments[4], exception); \
-        if (*exception) { return JS_undefined; }; \
+        Exports = JSValueToObject(context, ARGV(1), _exception); \
+        if (*_exception) { return JS_undefined; }; \
+        Module = JSValueToObject(context, ARGV(2), _exception); \
+        if (*_exception) { return JS_undefined; }; \
+        System = JSValueToObject(context, ARGV(3), _exception); \
+        if (*_exception) { return JS_undefined; }; \
+        Print = JSValueToObject(context, ARGV(4), _exception); \
+        if (*_exception) { return JS_undefined; }; \
         if (!JSObjectIsFunction(context, Print)) { THROW("Argument 4 must be a function."); } \
 
 #define END_NARWHAL_MODULE \
@@ -138,5 +140,10 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
 
 #define DESTRUCTOR(f) void f(JSObjectRef object) \
     { \
+
+
+#define THROW(str) \
+    {*_exception = JSValueMakeStringWithUTF8CString(context, str);\
+    return JSValueMakeUndefined(context);}
 
 #endif
