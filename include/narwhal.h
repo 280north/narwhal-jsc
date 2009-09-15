@@ -141,9 +141,9 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
 #define DESTRUCTOR(f) void f(JSObjectRef object) \
     { \
 
-
-#define THROW(str) \
-    {*_exception = JSValueMakeStringWithUTF8CString(context, str);\
-    return JSValueMakeUndefined(context);}
+#define THROW(...) \
+    { char msg[1024]; snprintf(msg, 1024, __VA_ARGS__); \
+    *_exception = JSValueMakeStringWithUTF8CString(context, msg); \
+    return JSValueMakeUndefined(context); }
 
 #endif
