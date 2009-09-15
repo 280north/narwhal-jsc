@@ -1,0 +1,8 @@
+bin
+lib/*.dylib
+lib/*.dylib.dSYM
+lib/*.so
+lib/*.dll
+deps
+frameworks
+.DS_Store
