@@ -14,6 +14,8 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
 #define STRINGIZE2(s) #s
 #define STRINGIZE(s) STRINGIZE2(s)
 
+#define THIS thisObject
+
 #define ARGC argumentCount
 #define ARG_COUNT(c) if ( ARGC != c ) { THROW("Insufficient arguments"); }
 
@@ -43,11 +45,21 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
     JSStringGetUTF8CString(jsStr, variable, len);\
     JSStringRelease(jsStr);}
 
-#define JS_fn(f)        JSObjectMakeFunctionWithCallback(context, NULL, f)
+#define PINT(variable)  0; ARG_int(variable, _argn++); 0
+#define POBJ(variable)  0; ARG_obj(variable, _argn++); 0
+#define PUTF8(variable)  0; ARG_utf8(variable, _argn++); 0
+#define PSTR(variable)  0; ARG_utf8(variable, _argn++); 0
+
 #define JS_undefined    JSValueMakeUndefined(context)
 #define JS_null         JSValueMakeNull(context)
+#define JS_int(number)  JSValueMakeNumber(context, (double)number)
+#define JS_str_utf8(str, len) JSValueMakeStringWithUTF8CString(context, str)
+
+#define JS_fn(f)        JSObjectMakeFunctionWithCallback(context, NULL, f)
 #define JS_str_ref(str) JSStringCreateWithUTF8CString(str)
-#define JS_str_val(str) JSValueMakeStringWithUTF8CString(context, str)
+
+#define OBJECT_GET(object, name) \
+    JSObjectGetProperty(context, object, JS_str_ref(name), exception) 
 
 #define OBJECT_SET(object, name, value) \
     {JSObjectSetProperty(context, object, JS_str_ref(name), value, kJSPropertyAttributeNone, exception); \
@@ -63,8 +75,10 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
     const JSValueRef arguments[], \
     JSValueRef *exception) \
     
-#define FUNCTION(f) FUNC_HEADER(f) \
+#define FUNCTION(f,...) FUNC_HEADER(f) \
     { JSContextRef context = ctx; \
+        int _argn = 0; \
+        __VA_ARGS__; \
 
 #define CONSTRUCTOR(f) JSObjectRef f( \
     JSContextRef context, \
@@ -87,11 +101,11 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
     \
     void print(const char * string)\
     {\
-        JSValueRef argv[1] = { JS_str_val(string) }; \
+        JSValueRef argv[1] = { JS_str_utf8(string, strlen(string)) }; \
         JSObjectCallAsFunction(context, Print, NULL, 1, argv, NULL); \
     }\
     JSObjectRef require(const char *id) {\
-        JSValueRef argv[1] = { JS_str_val(id) }; \
+        JSValueRef argv[1] = { JS_str_utf8(id, strlen(id)) }; \
         return JSValueToObject(context, JSObjectCallAsFunction(context, Require, NULL, 1, argv, NULL), NULL); \
     }\
     \
@@ -116,5 +130,13 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
 
 #define END_NARWHAL_MODULE \
     return JS_undefined; }\
+
+#define GET_INTERNAL(type, name, object) \
+    type name = (type) JSObjectGetPrivate(object)
+#define SET_INTERNAL(object, data) \
+    JSObjectSetPrivate(object, (void *)data)
+
+#define DESTRUCTOR(f) void f(JSObjectRef object) \
+    { \
 
 #endif

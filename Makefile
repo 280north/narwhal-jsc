@@ -4,7 +4,7 @@ CPPFLAGS  =-g -arch i386 #-save-temps
 FRAMEWORKS_DIR=frameworks
 
 INCLUDES  =-Iinclude
-LIBS      =-lreadline -F$(FRAMEWORKS_DIR) -framework JavaScriptCore
+LIBS      =-lreadline -F$(FRAMEWORKS_DIR) -framework JavaScriptCore -L/usr/lib -liconv
 MODULES   =$(patsubst %.cc,%.dylib,$(patsubst src/%,lib/%,$(wildcard src/*.cc)))
 
 SOURCE    =narwhal-jsc.c
@@ -36,7 +36,7 @@ modules: $(MODULES)
 	
 lib/%.dylib: src/%.cc
 	mkdir -p `dirname $@`
-	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< -framework JavaScriptCore
+	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(LIBS)
 	install_name_tool -change "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore" "@executable_path/../frameworks/JavaScriptCore.framework/JavaScriptCore" $@
 
 frameworks: $(FRAMEWORKS)
@@ -64,10 +64,10 @@ $(JSCOCOA_CHECKOUT):
 	git clone git://github.com/parmanoir/jscocoa.git $@
 
 clean:
-	rm -rf bin/narwhal-jsc* bin/*.dylib bin/*.dSYM lib/*.dylib lib/*.dSYM $(EXECUTABLE) $(JSCORE_FRAMEWORK) $(JSCOCOA_FRAMEWORK) *.o *.ii *.s
+	rm -rf bin/narwhal-jsc* bin/*.dylib bin/*.dSYM lib/*.dylib lib/*.dSYM $(EXECUTABLE) *.o *.ii *.s
 
 cleaner: clean
-	rm -rf $(JSCORE_BUILD) $(JSCOCOA_BUILD)
+	rm -rf $(JSCORE_FRAMEWORK) $(JSCOCOA_FRAMEWORK) $(JSCORE_BUILD) $(JSCOCOA_BUILD)
 
 pristine: cleaner
 	rm -rf deps
