@@ -1,3 +1,5 @@
+#define NOTRACE
+
 #include <JavaScriptCore/JavaScriptCore.h>
 #include <stdio.h>
 #include <sys/stat.h>

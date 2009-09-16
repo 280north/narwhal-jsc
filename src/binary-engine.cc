@@ -4,12 +4,9 @@
 #include <iconv.h>
 #include <errno.h>
 
-typedef struct __BytesPrivate BytesPrivate;
+#include <binary-engine.h>
 
-struct __BytesPrivate {
-    unsigned char* buffer;
-    unsigned int length;
-};
+JSClassRef Bytes_class(JSContextRef context);
 
 DESTRUCTOR(Bytes_finalize)
 {    
@@ -23,18 +20,6 @@ DESTRUCTOR(Bytes_finalize)
     }
 }
 END
-
-JSClassRef Bytes_class(JSContextRef context)
-{
-    static JSClassRef jsClass;
-    if (!jsClass) {
-        JSClassDefinition definition = kJSClassDefinitionEmpty;
-        definition.finalize = Bytes_finalize;
-        
-        jsClass = JSClassCreate(&definition);
-    }
-    return jsClass;
-}
 
 JSObjectRef Bytes_new(JSContextRef context, unsigned char* buffer, unsigned int length)
 {
@@ -192,8 +177,6 @@ END
 
 NARWHAL_MODULE(binary_platform)
 {
-    JSObjectRef impljs = require("binary-engine.js");
-    
     EXPORTS("B_LENGTH", JS_fn(B_LENGTH));
     EXPORTS("B_ALLOC", JS_fn(B_ALLOC));
     EXPORTS("B_FILL", JS_fn(B_FILL));
@@ -201,10 +184,9 @@ NARWHAL_MODULE(binary_platform)
     EXPORTS("B_GET", JS_fn(B_GET));
     EXPORTS("B_SET", JS_fn(B_SET));
     
-    //EXPORTS("B_DECODE", JS_fn(B_DECODE));
-    EXPORTS("B_DECODE", OBJECT_GET(impljs, "B_DECODE"));
-    //EXPORTS("B_ENCODE", JS_fn(B_ENCODE));
-    EXPORTS("B_ENCODE", OBJECT_GET(impljs, "B_ENCODE"));
+    JSObjectRef binary_engine_js = require("binary-engine.js");
+    EXPORTS("B_DECODE", GET_VALUE(binary_engine_js, "B_DECODE"));
+    EXPORTS("B_ENCODE", GET_VALUE(binary_engine_js, "B_ENCODE"));
     
     EXPORTS("B_DECODE_DEFAULT", JS_fn(B_DECODE_DEFAULT));
     EXPORTS("B_ENCODE_DEFAULT", JS_fn(B_ENCODE_DEFAULT));
@@ -214,3 +196,17 @@ NARWHAL_MODULE(binary_platform)
     EXPORTS("DEFAULT_CODEC", JS_str_utf8("UTF-8", strlen("UTF-8")));
 }
 END_NARWHAL_MODULE
+
+
+JSClassRef Bytes_class(JSContextRef context)
+{
+    static JSClassRef jsClass;
+    if (!jsClass)
+    {
+        JSClassDefinition definition = kJSClassDefinitionEmpty;
+        definition.finalize = Bytes_finalize;
+
+        jsClass = JSClassCreate(&definition);
+    }
+    return jsClass;
+}
