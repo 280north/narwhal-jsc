@@ -11,7 +11,7 @@ JSClassRef Bytes_class(JSContextRef context);
 DESTRUCTOR(Bytes_finalize)
 {    
     GET_INTERNAL(BytesPrivate *, data, object);
-    printf("freeing bytes=[%p]\n", data);
+    DEBUG("freeing bytes=[%p]\n", data);
     if (data) {
         if (data->buffer)
             free(data->buffer);
@@ -87,8 +87,6 @@ FUNCTION(B_GET, ARG_OBJ(bytes), ARG_INT(index))
         THROW("B_GET: tried get beyond bounds");
     
     unsigned char b = bytes_data->buffer[index];
-    //printf("index=%d b=%u", index, b);
-    //printf("[%s][%p]\n", bytes_data->buffer, bytes_data->buffer);
     
     return JS_int((int)b);
 }

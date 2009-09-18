@@ -8,15 +8,27 @@
 #ifdef NOTRACE
 #define TRACE(...)
 #else
-#define TRACE(...) printf(__VA_ARGS__);
+#define TRACE(...) fprintf(stderr, __VA_ARGS__);
 #endif
+
+#define DEBUG(...)
+//#define DEBUG(...) fprintf(stderr, __VA_ARGS__);
+
+//#define THROW_DEBUG
+#define THROW_DEBUG " (%s:%d)\n"
+
+#define THROW(format, ...) \
+    { char msg[1024]; snprintf(msg, 1024, format THROW_DEBUG, ##__VA_ARGS__, __FILE__, __LINE__); \
+    DEBUG("THROWING: %s", msg); \
+    *_exception = JSValueMakeStringWithUTF8CString(context, msg); \
+    return NULL;/*JSValueMakeUndefined(context);*/ }
 
 
 JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string)
 {
     JSStringRef stringRef = JSStringCreateWithUTF8CString(string);
     if (!stringRef)
-        printf("OH NO!!!!\n");
+        return NULL;
     JSValueRef valueRef = JSValueMakeString(ctx, stringRef);
     JSStringRelease(stringRef);
     return valueRef;
@@ -40,7 +52,12 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
     if (index >= ARGC || !IS_NUMBER(ARGV(index))) THROW("Argument %d must be a number.", index) \
     int variable = (int)JSValueToNumber(context, ARGV(index), _exception); \
     if (*_exception) { return NULL; };
-
+    
+#define ARGN_DOUBLE(variable, index) \
+    if (index >= ARGC || !IS_NUMBER(ARGV(index))) THROW("Argument %d must be a number.", index) \
+    double variable = JSValueToNumber(context, ARGV(index), _exception); \
+    if (*_exception) { return NULL; };
+    
 #define ARGN_OBJ(variable, index) \
     if (index >= ARGC || !IS_OBJECT(ARGV(index))) THROW("Argument %d must be an object.", index) \
     JSObjectRef variable = JSValueToObject(context, ARGV(index), _exception); \
@@ -55,27 +72,31 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
     JSStringRef variable = JSValueToStringCopy(context, ARGV(index), _exception);\
     if (*_exception) { return NULL; }
 
-#define ARGN_UTF8(variable, index) \
-    if (index >= ARGC || !IS_STRING(ARGV(index))) THROW("Argument %d must be a string.", index) \
-    char *variable = NULL;\
-    {JSStringRef jsStr = JSValueToStringCopy(context, ARGV(index), _exception);\
+#define ARGN_UTF8_CAST(variable, index) \
+    if (index >= ARGC) THROW("Argument %d must be a string.", index) \
+    {_tmpStr = JSValueToStringCopy(context, ARGV(index), _exception);\
     if (*_exception) { return NULL; }\
-    size_t len = JSStringGetMaximumUTF8CStringSize(jsStr);\
-    variable = (char*)malloc(len);\
-    if (!variable) { JSStringRelease(jsStr); THROW("OOM"); }\
-    JSStringGetUTF8CString(jsStr, variable, len);\
-    JSStringRelease(jsStr);}
+    _tmpSz = JSStringGetMaximumUTF8CStringSize(_tmpStr); }\
+    char variable[_tmpSz]; \
+    {JSStringGetUTF8CString(_tmpStr, variable, _tmpSz);\
+    JSStringRelease(_tmpStr);}
 
-#define ARG_INT(variable)  0; ARGN_INT(variable, _argn); _argn++; 0
-#define ARG_OBJ(variable)  0; ARGN_OBJ(variable, _argn); _argn++; 0
-#define ARG_FN(variable)   0; ARGN_FN(variable, _argn); _argn++; 0
-#define ARG_STR(variable)  0; ARGN_STR(variable, _argn); _argn++; 0
-#define ARG_UTF8(variable) 0; ARGN_UTF8(variable, _argn); _argn++; 0
+#define ARGN_UTF8(variable, index) \
+    if (index >= ARGC && !IS_STRING(ARGV(index))) THROW("Argument %d must be a string.", index) \
+    ARGN_UTF8_CAST(variable, index)
+
+#define ARG_INT(variable)       0; ARGN_INT(variable, _argn); _argn++; 0
+#define ARG_DOUBLE(variable)    0; ARGN_INT(variable, _argn); _argn++; 0
+#define ARG_OBJ(variable)       0; ARGN_OBJ(variable, _argn); _argn++; 0
+#define ARG_FN(variable)        0; ARGN_FN(variable, _argn); _argn++; 0
+#define ARG_STR(variable)       0; ARGN_STR(variable, _argn); _argn++; 0
+#define ARG_UTF8(variable)      0; ARGN_UTF8(variable, _argn); _argn++; 0
+#define ARG_UTF8_CAST(variable) 0; ARGN_UTF8_CAST(variable, _argn); _argn++; 0
 
 #define JS_undefined    JSValueMakeUndefined(context)
 #define JS_null         JSValueMakeNull(context)
 #define JS_int(number)  JSValueMakeNumber(context, (double)number)
-#define JS_bool(b)      JSValueMakeNumber(context, (int)b)
+#define JS_bool(b)      JSValueMakeBoolean(context, (int)b)
 #define JS_str_utf8(str, len) JSValueMakeStringWithUTF8CString(context, str)
 
 #define JS_obj(value)   JSValueToObject(context, value, _exception)
@@ -102,7 +123,8 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
 
 #define EXPORTS(name, object) SET_VALUE(Exports, name, object);
 
-#define FUNC_HEADER(f) JSValueRef f( \
+#define FUNC_HEADER(f) \
+    JSValueRef f( \
     JSContextRef ctx, \
     JSObjectRef function, \
     JSObjectRef _this, \
@@ -110,21 +132,27 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
     const JSValueRef _argv[], \
     JSValueRef *_exception) \
 
-#define FUNCTION(f,...) FUNC_HEADER(f) \
+#define FUNCTION(f,...) \
+    FUNC_HEADER(f) \
     { \
         TRACE(" *** F: %s\n", STRINGIZE(f)) \
         JSContextRef context = ctx; \
+        size_t _tmpSz; \
+        JSStringRef _tmpStr; \
         int _argn = 0; \
         __VA_ARGS__; \
         
-#define CONSTRUCTOR(f,...) JSObjectRef f( \
-    JSContextRef context, \
-    JSObjectRef constructor, \
-    size_t _argc, \
-    const JSValueRef _argv[], \
-    JSValueRef *_exception) \
+#define CONSTRUCTOR(f,...) \
+    JSObjectRef f( \
+        JSContextRef context, \
+        JSObjectRef constructor, \
+        size_t _argc, \
+        const JSValueRef _argv[], \
+        JSValueRef *_exception) \
     { \
         TRACE(" *** C: %s\n", STRINGIZE(f)) \
+        size_t _tmpSz; \
+        JSStringRef _tmpStr; \
         int _argn = 0; \
         __VA_ARGS__; \
 
@@ -178,12 +206,6 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
 
 #define DESTRUCTOR(f) void f(JSObjectRef object) \
     { \
-
-#define THROW(...) \
-    { char msg[1024]; snprintf(msg, 1024, __VA_ARGS__); \
-    *_exception = JSValueMakeStringWithUTF8CString(context, msg); \
-    return NULL;/*JSValueMakeUndefined(context);*/ }
-
 
 #define ARGS_ARRAY(name, ...) JSValueRef name[] = { __VA_ARGS__ };
 

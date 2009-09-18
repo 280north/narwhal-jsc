@@ -16,16 +16,14 @@ CONSTRUCTOR(IO_constructor)
     
     if (ARGC > 0) {
        ARGN_INT(in_fd, 0);
-       printf("in_fd=%d\n", in_fd);
        data->input = in_fd;
     }
     if (ARGC > 1) {
        ARGN_INT(out_fd, 1);
-       printf("out_fd=%d\n", out_fd);
        data->output = out_fd;
     }
     
-    printf("io=[%d,%d]\n", data->input, data->output);
+    DEBUG("io=[%d,%d]\n", data->input, data->output);
     
     JSObjectRef object = JSObjectMake(context, IO_class(context), (void*)data);
     return object;
@@ -61,7 +59,7 @@ FUNCTION(IO_readInto, ARG_OBJ(buffer), ARG_INT(length))
     
     while (total < length) {
         bytesRead = read(fd, bytes->buffer + (offset + total), length - total);
-        printf("bytesRead=%d (length - total)=%d\n", bytesRead, length - total);
+        DEBUG("bytesRead=%d (length - total)=%d\n", bytesRead, length - total);
         if (bytesRead <= 0)
             break;
         total += bytesRead;
@@ -99,7 +97,7 @@ END
 FUNCTION(IO_flush)
 {
     GET_INTERNAL(IOPrivate*, data, THIS);
-    return JS_undefined;
+    return THIS;
 }
 END
 
@@ -123,7 +121,7 @@ void IO_finalize(JSObjectRef object)
 {
     GET_INTERNAL(IOPrivate*, data, object);
     
-    printf("freeing=[%d,%d]\n", data->input, data->output);
+    DEBUG("freeing io=[%d,%d]\n", data->input, data->output);
     
     if (data->input >= 0)
         close(data->input);
@@ -171,6 +169,7 @@ JSClassRef IO_class(JSContextRef context)
 
         jsClass = JSClassCreate(&definition);
     }
+    
     return jsClass;
 }
     

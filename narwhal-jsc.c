@@ -68,7 +68,7 @@ JSValueRef Print(
     const JSValueRef arguments[],
     JSValueRef *exception)
 {
-    int i;
+    size_t i;
     for (i = 0; i < argumentCount; i++) {
         JSValuePrint(context, arguments[i], exception);
         if (exception)
@@ -130,8 +130,6 @@ FUNCTION(IsFile)
 	struct stat stat_info;
     int ret = stat(buffer, &stat_info);
     
-    free(buffer);
-    
     return JSValueMakeBoolean(context, ret != -1 && S_ISREG(stat_info.st_mode));
 }
 END
@@ -169,7 +167,7 @@ FUNCTION(RequireNative)
     factory_t func = (factory_t)dlsym(handle, getModuleName());
     //printf("func=%p\n", func);
     if (func == NULL) {
-        printf("dlsym (%s) error: %s\n", getModuleName, dlerror());
+        printf("dlsym (%s) error: %s\n", getModuleName(), dlerror());
     	return JS_null;
     }
     
@@ -210,7 +208,7 @@ JSObjectRef envpToObject(JSGlobalContextRef context, char *envp[])
 JSObjectRef argvToArray(JSGlobalContextRef context, int argc, char *argv[])
 {
     JSValueRef exception = NULL;
-    JSValueRef *arguments = (JSValueRef*)malloc(sizeof(JSValueRef) * argc);
+    JSValueRef arguments[argc];
     
     int i;
     for (i = 0; i < argc; i++)
@@ -221,8 +219,6 @@ JSObjectRef argvToArray(JSGlobalContextRef context, int argc, char *argv[])
         JSValuePrint(context, exception, NULL);
         ARGS = NULL;
     }
-    
-    free(arguments);
     
     return ARGS;
 }
