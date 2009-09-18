@@ -14,18 +14,18 @@
 #import <JSCocoa/JSCocoa.h>
 #endif
 
-void JSValuePrint(JSContextRef ctx, JSValueRef value, JSValueRef *exception)
+void JSValuePrint(JSContextRef ctx, JSValueRef value, JSValueRef *_exception)
 {
-    JSStringRef string = JSValueToStringCopy(ctx, value, exception);
-    if (!string || exception && *exception)
+    JSStringRef string = JSValueToStringCopy(ctx, value, _exception);
+    if (!string || _exception && *_exception)
         return;
     
     size_t length = JSStringGetMaximumUTF8CStringSize(string);
     
     char *buffer = (char*)malloc(length);
     if (!buffer) {
-        if (exception)
-            *exception = JSValueMakeStringWithUTF8CString(ctx, "print error (malloc)");
+        if (_exception)
+            *_exception = JSValueMakeStringWithUTF8CString(ctx, "print error (malloc)");
         JSStringRelease(string);
         return;
     }
@@ -60,55 +60,25 @@ JSStringRef ReadFile(const char* name) {
     return result;
 }
 
-JSValueRef Print(
-    JSContextRef context,
-    JSObjectRef function,
-    JSObjectRef thisObject,
-    size_t argumentCount,
-    const JSValueRef arguments[],
-    JSValueRef *exception)
+FUNCTION(Print)
 {
     size_t i;
-    for (i = 0; i < argumentCount; i++) {
-        JSValuePrint(context, arguments[i], exception);
-        if (exception)
+    for (i = 0; i < ARGC; i++) {
+        JSValuePrint(context, ARGV(i), _exception);
+        if (_exception)
             return NULL;
     }
         
-    return JSValueMakeUndefined(context);
+    return JS_undefined;
 }
+END
 
-JSValueRef Read(
-    JSContextRef context,
-    JSObjectRef function,
-    JSObjectRef thisObject,
-    size_t argumentCount,
-    const JSValueRef arguments[],
-    JSValueRef *exception)
+FUNCTION(Read, ARG_UTF8(path))
 {
-    if (argumentCount == 0) {
-        *exception = JSValueMakeStringWithUTF8CString(context, "read() takes one argument");
-        return JSValueMakeUndefined(context);
-    }
-    
-    JSStringRef string = JSValueToStringCopy(context, arguments[0], exception);
-    if (*exception) {
-        return JSValueMakeUndefined(context);
-    }
-    
-    size_t length = JSStringGetMaximumUTF8CStringSize(string);
-    char *buffer = (char*)malloc(length);
-    if (!buffer) {
-        *exception = JSValueMakeStringWithUTF8CString(context, "read() error occurred");
-        return JSValueMakeUndefined(context);
-    }
-        
-    JSStringGetUTF8CString(string, buffer, length);
-    JSStringRelease(string);
-    
-    JSStringRef contents = ReadFile(buffer);
-    free(buffer);
-    
+    ARG_COUNT(1);
+
+    JSStringRef contents = ReadFile(path);
+
     if (contents) {
         JSValueRef result = JSValueMakeString(context, contents);
         JSStringRelease(contents);
@@ -117,58 +87,48 @@ JSValueRef Read(
             return result;
     }
     
-    *exception = JSValueMakeStringWithUTF8CString(context, "read() error occurred");
-    return JSValueMakeUndefined(context);
-}
-
-FUNCTION(IsFile)
-{
-    ARG_COUNT(1);
+    *_exception = JSValueMakeStringWithUTF8CString(context, "read() error occurred");
     
-    ARGN_UTF8(buffer, 0);
-    
-	struct stat stat_info;
-    int ret = stat(buffer, &stat_info);
-    
-    return JSValueMakeBoolean(context, ret != -1 && S_ISREG(stat_info.st_mode));
+    return JS_undefined;
 }
 END
 
-typedef JSValueRef (*factory_t)(JSContextRef context,\
-    JSObjectRef function,\
-    JSObjectRef thisObject,\
-    size_t argumentCount,\
-    const JSValueRef arguments[],\
-    JSValueRef *exception);
+FUNCTION(IsFile, ARG_UTF8(path))
+{
+    ARG_COUNT(1);
+
+    struct stat stat_info;
+    int ret = stat(path, &stat_info);
+
+    return JS_bool(ret != -1 && S_ISREG(stat_info.st_mode));
+}
+END
+
+typedef JSObjectCallAsFunctionCallback factory_t;
 typedef const char *(*getModuleName_t)(void);
 
-FUNCTION(RequireNative)
+FUNCTION(RequireNative, ARG_UTF8(topId), ARG_UTF8(path))
 {
-	ARG_COUNT(2)
-	ARGN_UTF8(topId,0);
-    ARGN_UTF8(path,1);
+    ARG_COUNT(2)
     
-    printf("RequireNative! [%s] [%s] \n", topId, path);
+    DEBUG("RequireNative: topId=[%s] path=[%s] \n", topId, path);
     
     void *handle = dlopen(path, RTLD_LOCAL | RTLD_LAZY);
-    //printf("handle=%p\n", handle);
     if (handle == NULL) {
         printf("dlopen error: %s\n", dlerror());
-    	return JS_null;
+        return JS_null;
     }
     
     getModuleName_t getModuleName = (getModuleName_t)dlsym(handle, "getModuleName");
     if (getModuleName == NULL) {
-        printf("dlsym (getModuleName) error: %s\n", dlerror());
-    	return JS_null;
+        fprintf(stderr, "dlsym (getModuleName) error: %s\n", dlerror());
+        return JS_null;
     }
-    printf("getModuleName=%p moduleName=%s\n", getModuleName, getModuleName());
     
     factory_t func = (factory_t)dlsym(handle, getModuleName());
-    //printf("func=%p\n", func);
     if (func == NULL) {
-        printf("dlsym (%s) error: %s\n", getModuleName(), dlerror());
-    	return JS_null;
+        fprintf(stderr, "dlsym (%s) error: %s\n", getModuleName(), dlerror());
+        return JS_null;
     }
     
     return JS_fn(func);
@@ -177,7 +137,7 @@ END
 
 JSObjectRef envpToObject(JSGlobalContextRef context, char *envp[])
 {
-    JSValueRef exception = NULL;
+    JSValueRef _exception = NULL;
     JSObjectRef ENV = JSObjectMake(context, NULL, NULL);
     
     char *key, *value;
@@ -191,11 +151,11 @@ JSObjectRef envpToObject(JSGlobalContextRef context, char *envp[])
             propertyName,
             JSValueMakeStringWithUTF8CString(context, value),
             kJSPropertyAttributeNone,
-            &exception);
+            &_exception);
         JSStringRelease(propertyName);
         
-        if (exception) {
-            JSValuePrint(context, exception, NULL);
+        if (_exception) {
+            JSValuePrint(context, _exception, NULL);
             ENV = NULL;
         }
         
@@ -207,16 +167,16 @@ JSObjectRef envpToObject(JSGlobalContextRef context, char *envp[])
 
 JSObjectRef argvToArray(JSGlobalContextRef context, int argc, char *argv[])
 {
-    JSValueRef exception = NULL;
+    JSValueRef _exception = NULL;
     JSValueRef arguments[argc];
     
     int i;
     for (i = 0; i < argc; i++)
         arguments[i] = JSValueMakeStringWithUTF8CString(context, argv[i]);
     
-    JSObjectRef ARGS = JSObjectMakeArray(context, argc, arguments, &exception);
-    if (exception) {
-        JSValuePrint(context, exception, NULL);
+    JSObjectRef ARGS = JSObjectMakeArray(context, argc, arguments, &_exception);
+    if (_exception) {
+        JSValuePrint(context, _exception, NULL);
         ARGS = NULL;
     }
     
@@ -229,7 +189,7 @@ void RunShell(JSContextRef context) {
     while (true)
     {
 #ifdef JSCOCOA
-		NSAutoreleasePool *pool = [NSAutoreleasePool new];
+        NSAutoreleasePool *pool = [NSAutoreleasePool new];
 #endif
         char *str = readline("> ");
         if (str && *str)
@@ -240,17 +200,17 @@ void RunShell(JSContextRef context) {
         JSStringRef source = JSStringCreateWithUTF8CString(str);
         free(str);
         
-        JSValueRef exception = NULL;
+        JSValueRef _exception = NULL;
         
-        if (JSCheckScriptSyntax(context, source, 0, 0, &exception) && !exception)
+        if (JSCheckScriptSyntax(context, source, 0, 0, &_exception) && !_exception)
         {
-            JSValueRef value = JSEvaluateScript(context, source, 0, 0, 0, &exception);
+            JSValueRef value = JSEvaluateScript(context, source, 0, 0, 0, &_exception);
             
-            if (exception)
-                JSValuePrint(context, exception, NULL);
+            if (_exception)
+                JSValuePrint(context, _exception, NULL);
             
             if (value && !JSValueIsUndefined(context, value))
-                JSValuePrint(context, value, &exception);
+                JSValuePrint(context, value, &_exception);
         }
         else
         {
@@ -260,95 +220,33 @@ void RunShell(JSContextRef context) {
         JSStringRelease(source);
 
 #ifdef JSCOCOA
-		[pool drain];
+        [pool drain];
 #endif
     }
     printf("\n");
 }
 
-int main(int argc, char *argv[], char *envp[])
-{    
+int narwhal(int argc, char *argv[], char *envp[])
+{
 #ifdef JSCOCOA
-	NSAutoreleasePool *pool = [NSAutoreleasePool new];
-	JSCocoaController* jsc = [JSCocoa new];
-	JSGlobalContextRef context = [jsc ctx];
+    NSAutoreleasePool *pool = [NSAutoreleasePool new];
+    JSCocoaController* jsc = [JSCocoa new];
+    JSGlobalContextRef context = [jsc ctx];
 #else
-	JSGlobalContextRef context = JSGlobalContextCreate(NULL);
+    JSGlobalContextRef context = JSGlobalContextCreate(NULL);
 #endif
 
-    JSObjectRef global = JSContextGetGlobalObject(context);
+    JSObjectRef global = JS_GLOBAL;
     
     JSValueRef exception = NULL;
-    JSStringRef propertyName;
-    JSValueRef value;
+    JSValueRef *_exception = &exception;
 
-    // print
-    propertyName = JSStringCreateWithUTF8CString("print");
-    value = JSObjectMakeFunctionWithCallback(context, propertyName, Print);
-    JSObjectSetProperty(context, global, propertyName, value, kJSPropertyAttributeNone, &exception);
-    JSStringRelease(propertyName);
-    if (exception) {
-        JSValuePrint(context, exception, NULL);
-        return 1;
-    }
-    
-    // isFile
-    propertyName = JSStringCreateWithUTF8CString("isFile");
-    value = JSObjectMakeFunctionWithCallback(context, propertyName, IsFile);
-    JSObjectSetProperty(context, global, propertyName, value, kJSPropertyAttributeNone, &exception);
-    JSStringRelease(propertyName);
-    if (exception) {
-        JSValuePrint(context, exception, NULL);
-        return 1;
-    }
-    
-    // read
-    propertyName = JSStringCreateWithUTF8CString("read");
-    value = JSObjectMakeFunctionWithCallback(context, propertyName, Read);
-    JSObjectSetProperty(context, global, propertyName, value, kJSPropertyAttributeNone, &exception);
-    JSStringRelease(propertyName);
-    if (exception) {
-        JSValuePrint(context, exception, NULL);
-        return 1;
-    }
-    
-    // requireNative
-    propertyName = JSStringCreateWithUTF8CString("requireNative");
-    value = JSObjectMakeFunctionWithCallback(context, propertyName, RequireNative);
-    JSObjectSetProperty(context, global, propertyName, value, kJSPropertyAttributeNone, &exception);
-    JSStringRelease(propertyName);
-    if (exception) {
-        JSValuePrint(context, exception, NULL);
-        return 1;
-    }
-    
-    // ARGS
-    value = argvToArray(context, argc, argv);
-    if (value) {
-        propertyName = JSStringCreateWithUTF8CString("ARGS");
-        JSObjectSetProperty(context, global, propertyName, value, kJSPropertyAttributeNone, &exception);
-        JSStringRelease(propertyName);
-        if (exception) {
-            JSValuePrint(context, exception, NULL);
-            return 1;
-        }
-    }
-    else
-        printf("Problem setting up ARGS\n");
-
-    // ENV
-    value = envpToObject(context, envp);
-    if (value) {
-        propertyName = JSStringCreateWithUTF8CString("ENV");
-        JSObjectSetProperty(context, global, propertyName, value, kJSPropertyAttributeNone, &exception);
-        JSStringRelease(propertyName);
-        if (exception) {
-            JSValuePrint(context, exception, NULL);
-            return 1;
-        }
-    }
-    else
-        printf("Problem setting up ENV\n");
+    SET_VALUE(global, "print",          JS_fn(Print));
+    SET_VALUE(global, "isFile",         JS_fn(IsFile));
+    SET_VALUE(global, "read",           JS_fn(Read));
+    SET_VALUE(global, "requireNative",  JS_fn(RequireNative));
+    SET_VALUE(global, "ARGS",           argvToArray(context, argc, argv));
+    SET_VALUE(global, "ENV",            envpToObject(context, envp));
     
     // Load bootstrap.js
     char buffer[1024];
@@ -358,16 +256,21 @@ int main(int argc, char *argv[], char *envp[])
         printf("Error reading bootstrap.js\n");
         return 1;
     }
-    JSEvaluateScript(context, source, 0, 0, 0, &exception);
+    JSEvaluateScript(context, source, 0, 0, 0, _exception);
     JSStringRelease(source);
-    if (exception) {
-        JSValuePrint(context, exception, NULL);
+    if (_exception) {
+        JSValuePrint(context, *_exception, NULL);
         return 1;
     }
     
     RunShell(context);
 
 #ifdef JSCOCOA
-	[pool drain];
+    [pool drain];
 #endif
+}
+
+int main(int argc, char *argv[], char *envp[])
+{
+    return narwhal(argc, argv, envp);
 }

@@ -38,6 +38,7 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
 #define STRINGIZE(s) STRINGIZE2(s)
 
 #define THIS _this
+#define JS_GLOBAL JSContextGetGlobalObject(context)
 
 #define ARGC _argc
 #define ARGV(index) _argv[index]
@@ -100,16 +101,23 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
 #define JS_str_utf8(str, len) JSValueMakeStringWithUTF8CString(context, str)
 
 #define JS_obj(value)   JSValueToObject(context, value, _exception)
-
-
 #define JS_fn(f)        JSObjectMakeFunctionWithCallback(context, NULL, f)
-#define JS_str_ref(str) JSStringCreateWithUTF8CString(str)
+
+JSValueRef _GET_VALUE(JSContextRef context, JSObjectRef object, const char *name, JSValueRef *_exception) {
+    JSStringRef nameStr = JSStringCreateWithUTF8CString(name);
+    JSValueRef value = JSObjectGetProperty(context, object, nameStr, _exception);
+    JSStringRelease(nameStr);
+    return value;
+}
 
 #define GET_VALUE(object, name) \
-    JSObjectGetProperty(context, object, JS_str_ref(name), _exception) 
+    _GET_VALUE(context, object, name, _exception)
+//    JSObjectGetProperty(context, object, JSStringCreateWithUTF8CString(name), _exception) 
 
 #define SET_VALUE(object, name, value) \
-    {JSObjectSetProperty(context, object, JS_str_ref(name), value, kJSPropertyAttributeNone, _exception); \
+    {JSStringRef nameStr = JSStringCreateWithUTF8CString(name); \
+    JSObjectSetProperty(context, object, nameStr, value, kJSPropertyAttributeNone, _exception); \
+    JSStringRelease(nameStr); \
     if (*_exception) { return NULL; }}
 
 #define GET_OBJECT(object, name) \
