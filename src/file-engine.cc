@@ -13,7 +13,7 @@ extern JSObjectRef Exports;
 extern JSObjectRef Module;
 extern JSObjectRef System;
 extern JSObjectRef Print;
-extern JSContextRef context;
+extern JSContextRef _context;
 extern void print(const char * string);
 extern JSObjectRef require(const char *id);
 
@@ -272,12 +272,12 @@ FUNCTION(F_list, ARG_UTF8_CAST(path))
         THROW("No such directory");
     }
 
-    JSObjectRef array = JSObjectMakeArray(context, 0, NULL, _exception);
+    JSObjectRef array = JSObjectMakeArray(_context, 0, NULL, _exception);
 
     int index = 0;
     while ((dirp = readdir(dp)) != NULL) {
         if (strcmp(".", dirp->d_name) && strcmp("..", dirp->d_name))
-            JSObjectSetPropertyAtIndex(context, array, index++, JS_str_utf8(dirp->d_name, dirp->d_namlenq), _exception);
+            JSObjectSetPropertyAtIndex(_context, array, index++, JS_str_utf8(dirp->d_name, dirp->d_namlenq), _exception);
     }
     closedir(dp);
 

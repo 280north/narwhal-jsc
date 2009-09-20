@@ -6,7 +6,7 @@
 #include <io-engine.h>
 #include <binary-engine.h>
 
-JSClassRef IO_class(JSContextRef context);
+JSClassRef IO_class(JSContextRef _context);
 
 CONSTRUCTOR(IO_constructor)
 {
@@ -25,7 +25,7 @@ CONSTRUCTOR(IO_constructor)
     
     DEBUG("io=[%d,%d]\n", data->input, data->output);
     
-    JSObjectRef object = JSObjectMake(context, IO_class(context), (void*)data);
+    JSObjectRef object = JSObjectMake(_context, IO_class(_context), (void*)data);
     return object;
 }
 END
@@ -133,7 +133,7 @@ void IO_finalize(JSObjectRef object)
 
 NARWHAL_MODULE(io_engine)
 {
-    JSObjectRef IO = JSObjectMakeConstructor(context, IO_class(context), IO_constructor);
+    JSObjectRef IO = JSObjectMakeConstructor(_context, IO_class(_context), IO_constructor);
     EXPORTS("IO", IO);
     
     EXPORTS("STDIN_FILENO", JS_int(STDIN_FILENO));
@@ -148,7 +148,7 @@ NARWHAL_MODULE(io_engine)
 END_NARWHAL_MODULE
 
 
-JSClassRef IO_class(JSContextRef context)
+JSClassRef IO_class(JSContextRef _context)
 {
     static JSClassRef jsClass;
     if (!jsClass)

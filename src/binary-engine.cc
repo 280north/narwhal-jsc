@@ -6,7 +6,7 @@
 
 #include <binary-engine.h>
 
-JSClassRef Bytes_class(JSContextRef context);
+JSClassRef Bytes_class(JSContextRef _context);
 
 DESTRUCTOR(Bytes_finalize)
 {    
@@ -21,7 +21,7 @@ DESTRUCTOR(Bytes_finalize)
 }
 END
 
-JSObjectRef Bytes_new(JSContextRef context, unsigned char* buffer, unsigned int length)
+JSObjectRef Bytes_new(JSContextRef _context, unsigned char* buffer, unsigned int length)
 {
     BytesPrivate *data = (BytesPrivate*)malloc(sizeof(BytesPrivate));
     if (!data) return NULL;
@@ -29,7 +29,7 @@ JSObjectRef Bytes_new(JSContextRef context, unsigned char* buffer, unsigned int 
     data->length = length;
     data->buffer = buffer;
     
-    return JSObjectMake(context, Bytes_class(context), data);
+    return JSObjectMake(_context, Bytes_class(_context), data);
 }
 
 FUNCTION(B_ALLOC, ARG_INT(length))
@@ -38,7 +38,7 @@ FUNCTION(B_ALLOC, ARG_INT(length))
     if (!buffer)
         THROW("B_ALLOC: Couldn't alloc buffer");
     
-    return Bytes_new(context, buffer, length);//Persistent<Object>::New(Bytes_new(buffer, length));
+    return Bytes_new(_context, buffer, length);//Persistent<Object>::New(Bytes_new(buffer, length));
 }
 END
 
@@ -124,7 +124,7 @@ FUNCTION(B_ENCODE_DEFAULT, ARG_UTF8(string))
 
     memcpy(buffer, string, length);
 
-    return Bytes_new(context, buffer, length);
+    return Bytes_new(_context, buffer, length);
 }
 END
     
@@ -192,7 +192,7 @@ FUNCTION(B_DECODE, ARG_OBJ(bytes), ARG_INT(offset), ARG_INT(srcLength), ARG_UTF8
     const JSChar* chars = (JSChar*)dst;
     size_t numChars = dstLength / sizeof(JSChar);
     
-    JSValueRef string = JSValueMakeString(context, JSStringCreateWithCharacters(chars, numChars));
+    JSValueRef string = JSValueMakeString(_context, JSStringCreateWithCharacters(chars, numChars));
     free(dst);
     
     return string;
@@ -210,7 +210,7 @@ FUNCTION(B_ENCODE, ARG_STR(string), ARG_UTF8(codec))
     if (!transcode(src, srcLength, &dst, &dstLength, "UTF-16LE", codec))
         THROW("B_ENCODE: iconv error");
     
-    JSValueRef bytes = Bytes_new(context, (unsigned char *)dst, dstLength);
+    JSValueRef bytes = Bytes_new(_context, (unsigned char *)dst, dstLength);
     //free(dst);
     
     return bytes;
@@ -227,7 +227,7 @@ FUNCTION(B_TRANSCODE, ARG_OBJ(srcBytes), ARG_INT(srcOffset), ARG_INT(srcLength),
     if (!transcode((char *)(src_data->buffer + srcOffset), srcLength, &dst, &dstLength, srcCodec, dstCodec))
         THROW("B_TRANSCODE: iconv error");
 
-    JSValueRef dstBytes = Bytes_new(context, (unsigned char *)dst, dstLength);
+    JSValueRef dstBytes = Bytes_new(_context, (unsigned char *)dst, dstLength);
     //free(dst);
 
     return dstBytes;
@@ -256,7 +256,7 @@ NARWHAL_MODULE(binary_platform)
 END_NARWHAL_MODULE
 
 
-JSClassRef Bytes_class(JSContextRef context)
+JSClassRef Bytes_class(JSContextRef _context)
 {
     static JSClassRef jsClass;
     if (!jsClass)
