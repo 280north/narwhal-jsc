@@ -4,8 +4,8 @@
 typedef struct __BytesPrivate BytesPrivate;
 
 struct __BytesPrivate {
-    unsigned char* buffer;
-    unsigned int length;
+    char *buffer;
+    size_t length;
 };
 
 #endif

@@ -3,6 +3,8 @@
 
 #include <JavaScriptCore/JavaScriptCore.h>
 
+#define NARWHAL_JSC
+
 #define NOTRACE
 
 #ifdef NOTRACE
@@ -24,21 +26,35 @@
     return NULL;/*JSValueMakeUndefined(_context);*/ }
 
 
-JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string)
+JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef _context, const char *string)
 {
     JSStringRef stringRef = JSStringCreateWithUTF8CString(string);
     if (!stringRef)
         return NULL;
-    JSValueRef valueRef = JSValueMakeString(ctx, stringRef);
+    JSValueRef valueRef = JSValueMakeString(_context, stringRef);
     JSStringRelease(stringRef);
     return valueRef;
 }
+
+JSValueRef JSValueMakeStringWithUTF16(JSContextRef _context, JSChar *string, size_t len)
+{
+    JSStringRef stringRef = JSStringCreateWithCharacters(string, len);
+    if (!stringRef)
+        return NULL;
+    JSValueRef valueRef = JSValueMakeString(_context, stringRef);
+    JSStringRelease(stringRef);
+    return valueRef;
+}
+
 
 #define STRINGIZE2(s) #s
 #define STRINGIZE(s) STRINGIZE2(s)
 
 #define THIS _this
 #define JS_GLOBAL JSContextGetGlobalObject(_context)
+
+#define JSString JSValueRef
+#define JSObject JSObjectRef
 
 #define ARGC _argc
 #define ARGV(index) _argv[index]
@@ -70,8 +86,7 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
 
 #define ARGN_STR(variable, index) \
     if (index >= ARGC || !IS_STRING(ARGV(index))) THROW("Argument %d must be a string.", index) \
-    JSStringRef variable = JSValueToStringCopy(_context, ARGV(index), _exception);\
-    if (*_exception) { return NULL; }
+    JSValueRef variable = ARGV(index);
 
 #define ARGN_UTF8_CAST(variable, index) \
     if (index >= ARGC) THROW("Argument %d must be a string.", index) \
@@ -98,21 +113,19 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef ctx, const char *string
 #define JS_null         JSValueMakeNull(_context)
 #define JS_int(number)  JSValueMakeNumber(_context, (double)number)
 #define JS_bool(b)      JSValueMakeBoolean(_context, (int)b)
-#define JS_str_utf8(str, len) JSValueMakeStringWithUTF8CString(_context, str)
+#define JS_str_utf8(str, len) JSValueMakeStringWithUTF8CString(_context, str)    
+#define JS_str_utf16(str, len) JSValueMakeStringWithUTF16(_context, (JSChar*)str, (len)/sizeof(JSChar))
 
 #define JS_obj(value)   JSValueToObject(_context, value, _exception)
 #define JS_fn(f)        JSObjectMakeFunctionWithCallback(_context, NULL, f)
 
-JSValueRef _GET_VALUE(JSContextRef _context, JSObjectRef object, const char *name, JSValueRef *_exception) {
+#define GET_VALUE(object, name) _GET_VALUE(_context, _exception, object, name)
+JSValueRef _GET_VALUE(JSContextRef _context, JSValueRef *_exception, JSObjectRef object, const char *name) {
     JSStringRef nameStr = JSStringCreateWithUTF8CString(name);
     JSValueRef value = JSObjectGetProperty(_context, object, nameStr, _exception);
     JSStringRelease(nameStr);
     return value;
 }
-
-#define GET_VALUE(object, name) \
-    _GET_VALUE(_context, object, name, _exception)
-//    JSObjectGetProperty(_context, object, JSStringCreateWithUTF8CString(name), _exception) 
 
 #define SET_VALUE(object, name, value) \
     {JSStringRef nameStr = JSStringCreateWithUTF8CString(name); \
@@ -133,7 +146,7 @@ JSValueRef _GET_VALUE(JSContextRef _context, JSObjectRef object, const char *nam
 
 #define FUNC_HEADER(f) \
     JSValueRef f( \
-    JSContextRef ctx, \
+    JSContextRef _ctx, \
     JSObjectRef function, \
     JSObjectRef _this, \
     size_t _argc, \
@@ -144,10 +157,10 @@ JSValueRef _GET_VALUE(JSContextRef _context, JSObjectRef object, const char *nam
     FUNC_HEADER(f) \
     { \
         TRACE(" *** F: %s\n", STRINGIZE(f)) \
-        JSContextRef _context = ctx; \
-        size_t _tmpSz; \
-        JSStringRef _tmpStr; \
+        JSContextRef _context = _ctx; \
         int _argn = 0; \
+        JSStringRef _tmpStr; \
+        size_t _tmpSz; \
         __VA_ARGS__; \
         
 #define CONSTRUCTOR(f,...) \
@@ -159,13 +172,13 @@ JSValueRef _GET_VALUE(JSContextRef _context, JSObjectRef object, const char *nam
         JSValueRef *_exception) \
     { \
         TRACE(" *** C: %s\n", STRINGIZE(f)) \
-        size_t _tmpSz; \
-        JSStringRef _tmpStr; \
         int _argn = 0; \
+        JSStringRef _tmpStr; \
+        size_t _tmpSz; \
         __VA_ARGS__; \
 
 #define END \
-    }\
+    }
 
 #define NARWHAL_MODULE(MODULE_NAME) \
     JSObjectRef Require; \
@@ -189,7 +202,7 @@ JSValueRef _GET_VALUE(JSContextRef _context, JSObjectRef object, const char *nam
     extern "C" const char * getModuleName() { return moduleName; }\
     \
     extern "C" FUNC_HEADER(MODULE_NAME) \
-        { _context = ctx; \
+        { _context = _ctx; \
         ARG_COUNT(5); \
         Require = JSValueToObject(_context, ARGV(0), _exception); \
         if (*_exception) { return NULL; }; \
@@ -223,5 +236,23 @@ JSValueRef _GET_VALUE(JSContextRef _context, JSObjectRef object, const char *nam
 #define CALL_AS_CONSTRUCTOR(object, argc, argv) \
     JSObjectCallAsConstructor(_context, object, argc, argv, _exception)
 
+#define GET_UTF16(string, buffer, length) _GET_UTF16(_context, _exception, string, (JSChar**)buffer, length)
+int _GET_UTF16(JSContextRef _context, JSValueRef *_exception, JSValueRef str, JSChar **buffer, size_t *length) {
+    JSStringRef string = JSValueToStringCopy(_context, str, _exception);
+    
+    *length = (size_t)(JSStringGetLength(string) * sizeof(JSChar));
+    *buffer = (JSChar*)malloc(*length);
+    
+    if (!*buffer)
+        return 0;
+    
+    memcpy(*buffer, JSStringGetCharactersPtr(string), *length);
+    
+    JSStringRelease(string);
+    
+    return 1;
+}
+
+#define CALL(f, ...) f(_context, _exception, __VA_ARGS__)
 
 #endif

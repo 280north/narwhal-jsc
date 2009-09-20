@@ -14,9 +14,17 @@
 #import <JSCocoa/JSCocoa.h>
 #endif
 
-void JSValuePrint(JSContextRef ctx, JSValueRef value, JSValueRef *_exception)
+#define HANDLE_EXCEPTION(shouldPrint, shouldReturn) \
+    if (*_exception) { \
+        if (shouldPrint) JSValuePrint(_context, NULL, *_exception); \
+        if (shouldReturn) return NULL; \
+    } \
+
+void JSValuePrint(JSContextRef _context, JSValueRef *_exception, JSValueRef value)
 {
-    JSStringRef string = JSValueToStringCopy(ctx, value, _exception);
+    if (!value) return;
+    
+    JSStringRef string = JSValueToStringCopy(_context, value, _exception);
     if (!string || _exception && *_exception)
         return;
     
@@ -25,7 +33,7 @@ void JSValuePrint(JSContextRef ctx, JSValueRef value, JSValueRef *_exception)
     char *buffer = (char*)malloc(length);
     if (!buffer) {
         if (_exception)
-            *_exception = JSValueMakeStringWithUTF8CString(ctx, "print error (malloc)");
+            *_exception = JSValueMakeStringWithUTF8CString(_context, "print error (malloc)");
         JSStringRelease(string);
         return;
     }
@@ -64,7 +72,7 @@ FUNCTION(Print)
 {
     size_t i;
     for (i = 0; i < ARGC; i++) {
-        JSValuePrint(_context, ARGV(i), _exception);
+        JSValuePrint(_context, _exception, ARGV(i));
         if (_exception)
             return NULL;
     }
@@ -135,9 +143,8 @@ FUNCTION(RequireNative, ARG_UTF8(topId), ARG_UTF8(path))
 }
 END
 
-JSObjectRef envpToObject(JSGlobalContextRef _context, char *envp[])
+JSObjectRef envpToObject(JSGlobalContextRef _context, JSValueRef *_exception, char *envp[])
 {
-    JSValueRef _exception = NULL;
     JSObjectRef ENV = JSObjectMake(_context, NULL, NULL);
     
     char *key, *value;
@@ -145,19 +152,8 @@ JSObjectRef envpToObject(JSGlobalContextRef _context, char *envp[])
         value = strchr(key, '=') + 1;
         *(value - 1) = '\0';
         
-        JSStringRef propertyName = JSStringCreateWithUTF8CString(key);
-        JSObjectSetProperty(_context,
-            ENV,
-            propertyName,
-            JSValueMakeStringWithUTF8CString(_context, value),
-            kJSPropertyAttributeNone,
-            &_exception);
-        JSStringRelease(propertyName);
-        
-        if (_exception) {
-            JSValuePrint(_context, _exception, NULL);
-            ENV = NULL;
-        }
+        SET_VALUE(ENV, key, JS_str_utf8(value, strlen(value)));
+        HANDLE_EXCEPTION(true, true);
         
         *(value - 1) = '=';
     }
@@ -165,26 +161,22 @@ JSObjectRef envpToObject(JSGlobalContextRef _context, char *envp[])
     return ENV;
 }
 
-JSObjectRef argvToArray(JSGlobalContextRef _context, int argc, char *argv[])
+JSObjectRef argvToArray(JSGlobalContextRef _context, JSValueRef *_exception, int argc, char *argv[])
 {
-    JSValueRef _exception = NULL;
     JSValueRef arguments[argc];
     
     int i;
     for (i = 0; i < argc; i++)
         arguments[i] = JSValueMakeStringWithUTF8CString(_context, argv[i]);
     
-    JSObjectRef ARGS = JSObjectMakeArray(_context, argc, arguments, &_exception);
-    if (_exception) {
-        JSValuePrint(_context, _exception, NULL);
-        ARGS = NULL;
-    }
+    JSObjectRef ARGS = JSObjectMakeArray(_context, argc, arguments, _exception);
+    HANDLE_EXCEPTION(true, true);
     
     return ARGS;
 }
 
 // The read-eval-execute loop of the shell.
-void RunShell(JSContextRef _context) {
+void* RunShell(JSContextRef _context) {
     printf("Narwhal version %s, JavaScriptCore version %s\n", "0.1", "FOO");
     while (true)
     {
@@ -200,21 +192,22 @@ void RunShell(JSContextRef _context) {
         JSStringRef source = JSStringCreateWithUTF8CString(str);
         free(str);
         
-        JSValueRef _exception = NULL;
+        JSValueRef exception = NULL;
+        JSValueRef *_exception = &exception;
         
-        if (JSCheckScriptSyntax(_context, source, 0, 0, &_exception) && !_exception)
+        if (JSCheckScriptSyntax(_context, source, 0, 0, _exception) && !(*_exception))
         {
-            JSValueRef value = JSEvaluateScript(_context, source, 0, 0, 0, &_exception);
+            JSValueRef value = JSEvaluateScript(_context, source, 0, 0, 0, _exception);
+            HANDLE_EXCEPTION(true, false);
             
-            if (_exception)
-                JSValuePrint(_context, _exception, NULL);
-            
-            if (value && !JSValueIsUndefined(_context, value))
-                JSValuePrint(_context, value, &_exception);
+            if (value && !JSValueIsUndefined(_context, value)) {
+                JSValuePrint(_context, _exception, value);
+                HANDLE_EXCEPTION(true, false);
+            }
         }
         else
         {
-            printf("Syntax error\n");
+            HANDLE_EXCEPTION(true, false);
         }
         
         JSStringRelease(source);
@@ -245,23 +238,23 @@ int narwhal(int argc, char *argv[], char *envp[])
     SET_VALUE(global, "isFile",         JS_fn(IsFile));
     SET_VALUE(global, "read",           JS_fn(Read));
     SET_VALUE(global, "requireNative",  JS_fn(RequireNative));
-    SET_VALUE(global, "ARGS",           argvToArray(_context, argc, argv));
-    SET_VALUE(global, "ENV",            envpToObject(_context, envp));
+    SET_VALUE(global, "ARGS",           argvToArray(_context, _exception, argc, argv));
+    SET_VALUE(global, "ENV",            envpToObject(_context, _exception, envp));
     
     // Load bootstrap.js
-    char buffer[1024];
-    snprintf(buffer, sizeof(buffer), "%s/bootstrap.js", getenv("NARWHAL_ENGINE_HOME"));
-    JSStringRef source = ReadFile(buffer);
-    if (!source) {
+    char *NARWHAL_ENGINE_HOME = getenv("NARWHAL_ENGINE_HOME");
+    char *bootstrapPathRelative = "/bootstrap.js";
+    char bootstrapPathFull[strlen(NARWHAL_ENGINE_HOME) + strlen(bootstrapPathRelative) + 1];
+    snprintf(bootstrapPathFull, sizeof(bootstrapPathFull), "%s%s", NARWHAL_ENGINE_HOME, bootstrapPathRelative);
+    
+    JSStringRef bootstrapSource = ReadFile(bootstrapPathFull);
+    if (!bootstrapSource) {
         printf("Error reading bootstrap.js\n");
         return 1;
     }
-    JSEvaluateScript(_context, source, 0, 0, 0, _exception);
-    JSStringRelease(source);
-    if (_exception) {
-        JSValuePrint(_context, *_exception, NULL);
-        return 1;
-    }
+    JSEvaluateScript(_context, bootstrapSource, 0, 0, 0, _exception);
+    JSStringRelease(bootstrapSource);
+    HANDLE_EXCEPTION(true, true);
     
     RunShell(_context);
 
