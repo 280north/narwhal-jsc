@@ -117,32 +117,34 @@ END
 FUNCTION(B_ENCODE_DEFAULT, ARG_UTF8(string))
 {
     int length = strlen(string);
-    
+
     unsigned char* buffer = (unsigned char*)calloc(length, sizeof(char));
     if (!buffer)
         THROW("B_ENCODE_DEFAULT: Couldn't alloc buffer");
-    
+
     memcpy(buffer, string, length);
-    
-    return Bytes_new(context, buffer, length);//Persistent<Object>::New(Bytes_new(buffer, length));
+
+    return Bytes_new(context, buffer, length);
 }
 END
-
-FUNCTION(B_TRANSCODE, ARG_OBJ(src), ARG_INT(offset), ARG_INT(length), ARG_UTF8(sourceCodec), ARG_UTF8(targetCodec))
-{
-    GET_INTERNAL(BytesPrivate*, src_data, src);
     
-    int dst_length = length*10; // FIXME!!!!!!
+int transcode(char *src, size_t srcLength, char **dstOut, size_t *dstLengthOut, const char *srcCodec, const char *dstCodec)
+{
+    int dst_length = srcLength*10; // FIXME!!!!!!
     char *dst = (char*)calloc(dst_length, 1);
-    if (!dst)
-        THROW("B_TRANSCODE: malloc fail");
+    if (!dst) {
+        perror("transcode");
+        return 0;
+    }
 
-    iconv_t cd = iconv_open(targetCodec, sourceCodec);
-    if (cd == (iconv_t)-1)
-        THROW("B_TRANSCODE: iconv_open fail");
+    iconv_t cd = iconv_open(dstCodec, srcCodec);
+    if (cd == (iconv_t)-1) {
+        perror("transcode");
+        return 0;
+    }
 
-    char *src_buf = (char*)(src_data->buffer + offset), *dst_buf = dst;
-    size_t src_bytes_left = (size_t)length, dst_bytes_left = (size_t)dst_length, converted=0;
+    char *src_buf = src, *dst_buf = dst;
+    size_t src_bytes_left = (size_t)srcLength, dst_bytes_left = (size_t)dst_length, converted=0;
     
     while (dst_bytes_left > 0)
     {
@@ -152,8 +154,8 @@ FUNCTION(B_TRANSCODE, ARG_OBJ(src), ARG_INT(offset), ARG_INT(length), ARG_UTF8(s
         {
             if (errno != EINVAL)
             {
-                perror("B_TRANSCODE");
-                THROW("B_TRANSCODE: iconv error");
+                perror("transcode");
+                return 0;
             }
         }
     }
@@ -161,15 +163,74 @@ FUNCTION(B_TRANSCODE, ARG_OBJ(src), ARG_INT(offset), ARG_INT(length), ARG_UTF8(s
     if (dst_bytes_left >= sizeof (wchar_t))
         *((wchar_t *) dst_buf) = L'\0';
     
-    if (iconv_close(cd))
-        THROW("B_TRANSCODE: iconv_close error");
+    if (iconv_close(cd)) {
+        perror("transcode");
+        return 0;
+    }
     
-    if (src_bytes_left > 0)
-        THROW("B_TRANSCODE: buffer not big enough");
-        
-    //Handle<Object> bytes = Persistent<Object>::New(Bytes_new((unsigned char *)dst, dst_length - dst_bytes_left));
+    if (src_bytes_left > 0) {
+        perror("transcode");
+        return 0;
+    }
+    
+    *dstOut = dst;
+    *dstLengthOut = (dst_length - dst_bytes_left);
+    
+    return 1;
+}
 
-    return Bytes_new(context, (unsigned char *)dst, dst_length - dst_bytes_left);//bytes;
+FUNCTION(B_DECODE, ARG_OBJ(bytes), ARG_INT(offset), ARG_INT(srcLength), ARG_UTF8(codec))
+{
+    GET_INTERNAL(BytesPrivate*, src_data, bytes);
+
+    char *dst;
+    size_t dstLength;
+
+    if (!transcode((char *)(src_data->buffer + offset), srcLength, &dst, &dstLength, codec, "UTF-16LE"))
+        THROW("B_DECODE: iconv error");
+
+    const JSChar* chars = (JSChar*)dst;
+    size_t numChars = dstLength / sizeof(JSChar);
+    
+    JSValueRef string = JSValueMakeString(context, JSStringCreateWithCharacters(chars, numChars));
+    free(dst);
+    
+    return string;
+}
+END
+    
+FUNCTION(B_ENCODE, ARG_STR(string), ARG_UTF8(codec))
+{
+    char *src = (char *)JSStringGetCharactersPtr(string);
+    size_t srcLength = JSStringGetLength(string) * sizeof(JSChar);
+    
+    char *dst;
+    size_t dstLength;
+
+    if (!transcode(src, srcLength, &dst, &dstLength, "UTF-16LE", codec))
+        THROW("B_ENCODE: iconv error");
+    
+    JSValueRef bytes = Bytes_new(context, (unsigned char *)dst, dstLength);
+    //free(dst);
+    
+    return bytes;
+}
+END
+
+FUNCTION(B_TRANSCODE, ARG_OBJ(srcBytes), ARG_INT(srcOffset), ARG_INT(srcLength), ARG_UTF8(srcCodec), ARG_UTF8(dstCodec))
+{
+    GET_INTERNAL(BytesPrivate*, src_data, srcBytes);
+
+    char *dst;
+    size_t dstLength;
+
+    if (!transcode((char *)(src_data->buffer + srcOffset), srcLength, &dst, &dstLength, srcCodec, dstCodec))
+        THROW("B_TRANSCODE: iconv error");
+
+    JSValueRef dstBytes = Bytes_new(context, (unsigned char *)dst, dstLength);
+    //free(dst);
+
+    return dstBytes;
 }
 END
 
@@ -181,10 +242,9 @@ NARWHAL_MODULE(binary_platform)
     EXPORTS("B_COPY", JS_fn(B_COPY));
     EXPORTS("B_GET", JS_fn(B_GET));
     EXPORTS("B_SET", JS_fn(B_SET));
-    
-    JSObjectRef binary_engine_js = require("binary-engine.js");
-    EXPORTS("B_DECODE", GET_VALUE(binary_engine_js, "B_DECODE"));
-    EXPORTS("B_ENCODE", GET_VALUE(binary_engine_js, "B_ENCODE"));
+
+    EXPORTS("B_DECODE", JS_fn(B_DECODE));
+    EXPORTS("B_ENCODE", JS_fn(B_ENCODE));
     
     EXPORTS("B_DECODE_DEFAULT", JS_fn(B_DECODE_DEFAULT));
     EXPORTS("B_ENCODE_DEFAULT", JS_fn(B_ENCODE_DEFAULT));
