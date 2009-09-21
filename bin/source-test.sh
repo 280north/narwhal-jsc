@@ -1,0 +1,5 @@
+export NARWHAL_HOME=$PWD/../narwhal
+export NARWHAL_ENGINE_HOME=$PWD
+#export NARWHAL_DEBUG=1
+#export NARWHAL_VERBOSE=1
+export NARWHAL_ENGINE=jsc
