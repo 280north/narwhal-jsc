@@ -3,10 +3,13 @@
 #include <sys/uio.h>
 #include <unistd.h>
 
+#include <iconv.h>
+
 #include <io-engine.h>
 #include <binary-engine.h>
 
 JSClassRef IO_class(JSContextRef _context);
+JSClassRef TextInputStream_class(JSContextRef _context);
 
 CONSTRUCTOR(IO_constructor)
 {
@@ -131,19 +134,182 @@ void IO_finalize(JSObjectRef object)
     free(data);
 }
 
+CONSTRUCTOR(TextInputStream_constructor)
+{
+    TextInputStreamPrivate *data = (TextInputStreamPrivate*)malloc(sizeof(TextInputStreamPrivate));
+
+    //raw, lineBuffering, buffering, charset, options
+    ARGN_OBJ(raw, 0);
+    //ARGN_OBJ(lineBuffering, 1);
+    //ARGN_OBJ(buffering, 2);
+    ARGN_STR_OR_NULL(charsetStr, 3);
+    //ARGN_OBJ(options, 4);
+    
+    data->inBuffer = (char*)malloc(1024);
+    data->inBufferSize = 1024;
+    data->inBufferUsed = 0;
+    
+    GET_INTERNAL(IOPrivate*, raw_data, raw);
+    data->input = raw_data->input;
+    
+    JSObjectRef object = JSObjectMake(_context, TextInputStream_class(_context), (void*)data);
+    
+    if (!charsetStr)
+        charsetStr = JS_str_utf8("UTF-8", strlen("UTF-8"));
+    
+    SET_VALUE(object, "raw", raw);
+    SET_VALUE(object, "charset", charsetStr);
+    
+    GET_UTF8(charset, charsetStr);
+    data->cd = iconv_open("UTF-16LE", charset);
+    if (data->cd == (iconv_t)-1)
+        THROW("Error TextInputStream (iconv_open)");
+    
+    return object;
+}
+END
+
+FUNCTION(TextInputStream_read)
+{
+    size_t numChars = 0;
+    if (ARGC > 0) {
+        ARGN_INT(n, 0);
+        numChars = n;
+    }
+    
+    GET_INTERNAL(TextInputStreamPrivate*, d, THIS);
+    int fd = d->input;
+    iconv_t cd = d->cd;
+    
+    size_t outBufferSize = numChars ? numChars * sizeof(JSChar) : 1024;
+    size_t outBufferUsed = 0;
+    char *outBuffer = (char*)malloc(outBufferSize);
+    
+    while (true) {
+        // if the outBuffer is completely filled, double it's size
+        if (outBufferUsed >= outBufferSize) {
+            outBufferSize *= 2;
+            DEBUG("reallocing: %d (maybe: %d)\n", outBufferSize, numChars);
+            
+            // if we were given a number of characters to read then we've read them all, so we're done
+            if (numChars != 0)
+                break;
+        
+            outBuffer = (char*)realloc(outBuffer, outBufferSize);
+        }
+        
+        // if there's no data in the buffer read some more
+        if (d->inBufferUsed == 0) {
+            DEBUG("nothing in inBuffer, reading more\n");
+            size_t num = read(fd, d->inBuffer + d->inBufferUsed, d->inBufferSize - d->inBufferUsed);
+            if (num >= 0)
+                d->inBufferUsed += num;
+        }
+        
+        // still no data to read, so stop
+        if (d->inBufferUsed == 0) {
+            DEBUG("still nothing in inBuffer, done reading for now\n");
+            break;
+        }
+        
+        char *in = d->inBuffer;
+        size_t inLeft = d->inBufferUsed;
+        char *out = outBuffer + outBufferUsed;
+        size_t outLeft = outBufferSize - outBufferUsed;
+        
+        size_t ret = iconv(cd, &in, &inLeft, &out, &outLeft);
+        if (ret != (size_t)-1 || errno == EINVAL || errno == E2BIG) {
+            if (inLeft) {
+                DEBUG("shifting %d bytes down by %d (had %d)\n", inLeft, in - d->inBuffer, d->inBufferUsed);
+                memmove(d->inBuffer, in, inLeft);
+            }
+            d->inBufferUsed = inLeft;
+            
+            outBufferUsed = outBufferSize - outLeft;
+            if (outBufferUsed != (out - outBuffer)) printf("sanity check failed: %d %d\n", outBufferUsed, (out - outBuffer));
+        } else if (errno == EILSEQ) {
+            // TODO: gracefully handle this case.
+            // Illegal character or shift sequence
+            THROW("Conversion error (Illegal character or shift sequence)");
+        } else if (errno == EBADF) {
+            // Invalid conversion descriptor
+            THROW("Conversion error (Invalid conversion descriptor)");
+        } else {
+            // This errno is not defined
+            THROW("Conversion error (unknown)");
+        }
+    }
+    
+    /*
+    FILE *tmp = fopen("tmp.utf16", "w");
+    fwrite(outBuffer, 1, outBufferUsed, tmp);
+    fclose(tmp);
+    //*/
+    
+    return JS_str_utf16(outBuffer, outBufferUsed);
+}
+END
+
+/*
+FUNCTION(TextInputStream_readLine)
+{
+}
+END
+
+FUNCTION(TextInputStream_next)
+{
+}
+END
+
+FUNCTION(TextInputStream_iterator)
+{
+}
+END
+
+FUNCTION(TextInputStream_forEach, ARG_FN(block), ARG_OBJ(context))
+{
+}
+END
+
+FUNCTION(TextInputStream_input)
+{
+}
+END
+
+FUNCTION(TextInputStream_readLines)
+{
+}
+END
+
+FUNCTION(TextInputStream_readInto, ARG_OBJ(buffer))
+{
+}
+END
+
+FUNCTION(TextInputStream_copy, ARG_OBJ(output), ARG_OBJ(mode), ARG_OBJ(options))
+{
+}
+END
+
+FUNCTION(TextInputStream_close)
+{
+}
+END
+*/
+
 NARWHAL_MODULE(io_engine)
 {
     JSObjectRef IO = JSObjectMakeConstructor(_context, IO_class(_context), IO_constructor);
     EXPORTS("IO", IO);
     
+    JSObjectRef TextInputStream = JSObjectMakeConstructor(_context, TextInputStream_class(_context), TextInputStream_constructor);
+    EXPORTS("TextInputStream", TextInputStream);
+    
     EXPORTS("STDIN_FILENO", JS_int(STDIN_FILENO));
     EXPORTS("STDOUT_FILENO", JS_int(STDOUT_FILENO));
     EXPORTS("STDERR_FILENO", JS_int(STDERR_FILENO));
     
-    JSObjectRef io_engine_js = require("io-engine.js");
-    EXPORTS("TextIOWrapper", GET_VALUE(io_engine_js, "TextIOWrapper"));
-    EXPORTS("TextInputStream", GET_VALUE(io_engine_js, "TextInputStream"));
-    EXPORTS("TextOutputStream", GET_VALUE(io_engine_js, "TextOutputStream"));
+    require("io-engine.js");
 }
 END_NARWHAL_MODULE
 
@@ -172,4 +338,34 @@ JSClassRef IO_class(JSContextRef _context)
     
     return jsClass;
 }
+
+JSClassRef TextInputStream_class(JSContextRef _context)
+{
+    static JSClassRef jsClass;
+    if (!jsClass)
+    {
+        JSStaticFunction staticFuctions[] = {
+            { "read",       TextInputStream_read,       kJSPropertyAttributeNone },
+            //{ "readLine",   TextInputStream_readLine,   kJSPropertyAttributeNone },
+            //{ "next",       TextInputStream_next,       kJSPropertyAttributeNone },
+            //{ "iterator",   TextInputStream_iterator,   kJSPropertyAttributeNone },
+            //{ "forEach",    TextInputStream_forEach,    kJSPropertyAttributeNone },
+            //{ "input",      TextInputStream_input,      kJSPropertyAttributeNone },
+            //{ "readLines",  TextInputStream_readLines,  kJSPropertyAttributeNone },
+            //{ "readInto",   TextInputStream_readInto,   kJSPropertyAttributeNone },
+            //{ "copy",       TextInputStream_copy,       kJSPropertyAttributeNone },
+            //{ "close",      TextInputStream_close,      kJSPropertyAttributeNone },
+            { NULL,         NULL,                       NULL }
+        };
+
+        JSClassDefinition definition = kJSClassDefinitionEmpty;
+        definition.className = "TextInputStream"; 
+        definition.staticFunctions = staticFuctions;
+        //definition.finalize = TextInputStream_finalize;
+        definition.callAsConstructor = TextInputStream_constructor;
+
+        jsClass = JSClassCreate(&definition);
+    }
     
+    return jsClass;
+}

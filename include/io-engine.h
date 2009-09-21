@@ -8,4 +8,16 @@ struct __IOPrivate {
     int output;
 };
 
+
+typedef struct __TextInputStreamPrivate TextInputStreamPrivate;
+
+struct __TextInputStreamPrivate {
+    int input;
+    iconv_t cd;
+    
+    char *inBuffer;
+    size_t inBufferSize;
+    size_t inBufferUsed;
+};
+
 #endif

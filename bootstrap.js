@@ -37,7 +37,7 @@
         debug: debug,
         print: function (string) { _print(String(string)); },
         evaluate: function (text) {
-             return eval("(function(require,exports,module,system,print){" + text + "/**/\n})");
+            return eval("(function(require,exports,module,system,print){" + text + "/**/\n})");
         },
         fs: {
             read: function(path) { return _read(path); },

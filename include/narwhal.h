@@ -6,15 +6,15 @@
 #define NARWHAL_JSC
 
 #define NOTRACE
+#define DEBUG(...)
+
+//#define DEBUG(...) fprintf(stderr, __VA_ARGS__);
 
 #ifdef NOTRACE
 #define TRACE(...)
 #else
 #define TRACE(...) fprintf(stderr, __VA_ARGS__);
 #endif
-
-#define DEBUG(...)
-//#define DEBUG(...) fprintf(stderr, __VA_ARGS__);
 
 //#define THROW_DEBUG
 #define THROW_DEBUG " (%s:%d)\n"
@@ -81,21 +81,28 @@ JSValueRef JSValueMakeStringWithUTF16(JSContextRef _context, JSChar *string, siz
     if (*_exception) { return NULL; };
     
 #define ARGN_FN(variable, index) \
-    if (!IS_FUNCTION(variable)) { THROW("Argument %d must be a function.", index); } \
     ARGN_OBJ(variable, index); \
+    if (!IS_FUNCTION(variable)) { THROW("Argument %d must be a function.", index); } \
 
 #define ARGN_STR(variable, index) \
     if (index >= ARGC || !IS_STRING(ARGV(index))) THROW("Argument %d must be a string.", index) \
     JSValueRef variable = ARGV(index);
 
-#define ARGN_UTF8_CAST(variable, index) \
-    if (index >= ARGC) THROW("Argument %d must be a string.", index) \
-    {_tmpStr = JSValueToStringCopy(_context, ARGV(index), _exception);\
+#define ARGN_STR_OR_NULL(variable, index) \
+    JSValueRef variable = ((index < ARGC) && IS_STRING(ARGV(index))) ? ARGV(index) : NULL;
+
+
+#define GET_UTF8(variable, value) \
+    {_tmpStr = JSValueToStringCopy(_context, value, _exception);\
     if (*_exception) { return NULL; }\
     _tmpSz = JSStringGetMaximumUTF8CStringSize(_tmpStr); }\
     char variable[_tmpSz]; \
     {JSStringGetUTF8CString(_tmpStr, variable, _tmpSz);\
     JSStringRelease(_tmpStr);}
+    
+#define ARGN_UTF8_CAST(variable, index) \
+    if (index >= ARGC) THROW("Argument %d must be a string.", index) \
+    GET_UTF8(variable, ARGV(index));
 
 #define ARGN_UTF8(variable, index) \
     if (index >= ARGC && !IS_STRING(ARGV(index))) THROW("Argument %d must be a string.", index) \
