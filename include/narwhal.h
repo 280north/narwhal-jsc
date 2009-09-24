@@ -1,23 +1,31 @@
 #ifndef __NARWHAL__
 #define __NARWHAL__
 
-#include <JavaScriptCore/JavaScriptCore.h>
-
+// platform name
 #define NARWHAL_JSC
 
+#include <JavaScriptCore/JavaScriptCore.h>
+#include <pthread.h>
+
+//#define DEBUG_ON
+#ifdef DEBUG_ON
+#define DEBUG(...) LOG(__VA_ARGS__)
+#define THROW_DEBUG " (%s:%d)\n"
+#else
 #define NOTRACE
 #define DEBUG(...)
+#define THROW_DEBUG
+#endif
 
-//#define DEBUG(...) fprintf(stderr, __VA_ARGS__);
-
+// "#define NOTRACE" at the top of files you don't want to enable tracing on
 #ifdef NOTRACE
 #define TRACE(...)
 #else
-#define TRACE(...) fprintf(stderr, __VA_ARGS__);
+#define TRACE(...) LOG(__VA_ARGS__);
 #endif
 
-//#define THROW_DEBUG
-#define THROW_DEBUG " (%s:%d)\n"
+#define ERROR(...) LOG(__VA_ARGS__)
+#define LOG(...) fprintf(stderr, __VA_ARGS__);
 
 #define THROW(format, ...) \
     { char msg[1024]; snprintf(msg, 1024, format THROW_DEBUG, ##__VA_ARGS__, __FILE__, __LINE__); \
@@ -25,6 +33,15 @@
     *_exception = JSValueMakeStringWithUTF8CString(_context, msg); \
     return NULL;/*JSValueMakeUndefined(_context);*/ }
 
+#define HANDLE_EXCEPTION_BLOCK(block) if (*_exception) block;
+#define HANDLE_EXCEPTION_PRINT() HANDLE_EXCEPTION_BLOCK({ JS_Print(*_exception); });
+#define HANDLE_EXCEPTION_RETURN(...) HANDLE_EXCEPTION_BLOCK({ return __VA_ARGS__; });
+
+#define HANDLE_EXCEPTION(shouldPrint, shouldReturn) \
+    HANDLE_EXCEPTION_BLOCK({ \
+        if (shouldPrint) {fprintf(stderr, "ERROR:" THROW_DEBUG, __FILE__, __LINE__); JS_Print(*_exception);} \
+        if (shouldReturn) return NULL; \
+    })
 
 JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef _context, const char *string)
 {
@@ -46,6 +63,30 @@ JSValueRef JSValueMakeStringWithUTF16(JSContextRef _context, JSChar *string, siz
     return valueRef;
 }
 
+void JSValuePrint(JSContextRef _context, JSValueRef *_exception, JSValueRef value)
+{
+    if (!value) return;
+
+    JSStringRef string = JSValueToStringCopy(_context, value, _exception);
+    if (!string || _exception && *_exception)
+        return;
+
+    size_t length = JSStringGetMaximumUTF8CStringSize(string);
+
+    char *buffer = (char*)malloc(length);
+    if (!buffer) {
+        if (_exception)
+            *_exception = JSValueMakeStringWithUTF8CString(_context, "print error (malloc)");
+        JSStringRelease(string);
+        return;
+    }
+
+    JSStringGetUTF8CString(string, buffer, length);
+    JSStringRelease(string);
+
+    puts(buffer);
+    free(buffer);
+}
 
 #define STRINGIZE2(s) #s
 #define STRINGIZE(s) STRINGIZE2(s)
@@ -194,6 +235,7 @@ JSValueRef _GET_VALUE(JSContextRef _context, JSValueRef *_exception, JSObjectRef
     JSObjectRef System; \
     JSObjectRef Print; \
     JSContextRef _context; \
+    NarwhalContext narwhal_context; \
     \
     void print(const char * string)\
     {\
@@ -206,7 +248,10 @@ JSValueRef _GET_VALUE(JSContextRef _context, JSValueRef *_exception, JSObjectRef
     }\
     \
     const char *moduleName = STRINGIZE(MODULE_NAME);\
-    extern "C" const char * getModuleName() { return moduleName; }\
+    extern "C" const char * narwhalModuleInit(NarwhalContext *_narwhal_context) { \
+        narwhal_context = *_narwhal_context; \
+        return moduleName; \
+    }\
     \
     extern "C" FUNC_HEADER(MODULE_NAME) \
         { _context = _ctx; \
@@ -261,5 +306,25 @@ int _GET_UTF16(JSContextRef _context, JSValueRef *_exception, JSValueRef str, JS
 }
 
 #define CALL(f, ...) f(_context, _exception, __VA_ARGS__)
+
+#define JS_Print(value) CALL(JSValuePrint, value)
+
+typedef struct __NarwhalContext NarwhalContext;
+struct __NarwhalContext {
+    pthread_mutex_t *mutex;
+    JSContextRef context;
+};
+
+extern NarwhalContext narwhal_context;
+
+#define LOCK() \
+    DEBUG("locking %p (%d)\n", narwhal_context.mutex, pthread_self()); \
+    pthread_mutex_lock(narwhal_context.mutex); \
+    DEBUG("locked %p (%d)\n", narwhal_context.mutex, pthread_self());
+
+#define UNLOCK() \
+    DEBUG("unlocking %p (%d)\n", narwhal_context.mutex, pthread_self()); \
+    pthread_mutex_unlock(narwhal_context.mutex); \
+    DEBUG("unlocked %p (%d)\n", narwhal_context.mutex, pthread_self());
 
 #endif

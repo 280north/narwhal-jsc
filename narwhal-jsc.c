@@ -14,37 +14,7 @@
 #import <JSCocoa/JSCocoa.h>
 #endif
 
-#define HANDLE_EXCEPTION(shouldPrint, shouldReturn) \
-    if (*_exception) { \
-        if (shouldPrint) JSValuePrint(_context, NULL, *_exception); \
-        if (shouldReturn) return NULL; \
-    } \
-
-void JSValuePrint(JSContextRef _context, JSValueRef *_exception, JSValueRef value)
-{
-    if (!value) return;
-    
-    JSStringRef string = JSValueToStringCopy(_context, value, _exception);
-    if (!string || _exception && *_exception)
-        return;
-    
-    size_t length = JSStringGetMaximumUTF8CStringSize(string);
-    
-    char *buffer = (char*)malloc(length);
-    if (!buffer) {
-        if (_exception)
-            *_exception = JSValueMakeStringWithUTF8CString(_context, "print error (malloc)");
-        JSStringRelease(string);
-        return;
-    }
-    
-    JSStringGetUTF8CString(string, buffer, length);
-    JSStringRelease(string);
-    
-    puts(buffer);
-    free(buffer);
-}
-
+NarwhalContext narwhal_context;
 
 // Reads a file into a v8 string.
 JSStringRef ReadFile(const char* name) {
@@ -72,7 +42,7 @@ FUNCTION(Print)
 {
     size_t i;
     for (i = 0; i < ARGC; i++) {
-        JSValuePrint(_context, _exception, ARGV(i));
+        JS_Print(ARGV(i));
         if (_exception)
             return NULL;
     }
@@ -113,7 +83,7 @@ FUNCTION(IsFile, ARG_UTF8(path))
 END
 
 typedef JSObjectCallAsFunctionCallback factory_t;
-typedef const char *(*getModuleName_t)(void);
+typedef const char *(*getModuleName_t)(NarwhalContext *);
 
 FUNCTION(RequireNative, ARG_UTF8(topId), ARG_UTF8(path))
 {
@@ -127,15 +97,17 @@ FUNCTION(RequireNative, ARG_UTF8(topId), ARG_UTF8(path))
         return JS_null;
     }
     
-    getModuleName_t getModuleName = (getModuleName_t)dlsym(handle, "getModuleName");
-    if (getModuleName == NULL) {
+    getModuleName_t narwhalModuleInit = (getModuleName_t)dlsym(handle, "narwhalModuleInit");
+    if (narwhalModuleInit == NULL) {
         fprintf(stderr, "dlsym (getModuleName) error: %s\n", dlerror());
         return JS_null;
     }
     
-    factory_t func = (factory_t)dlsym(handle, getModuleName());
+    const char *moduleName = narwhalModuleInit(&narwhal_context);
+    
+    factory_t func = (factory_t)dlsym(handle, moduleName);
     if (func == NULL) {
-        fprintf(stderr, "dlsym (%s) error: %s\n", getModuleName(), dlerror());
+        fprintf(stderr, "dlsym (%s) error: %s\n", moduleName, dlerror());
         return JS_null;
     }
     
@@ -187,21 +159,23 @@ void* RunShell(JSContextRef _context) {
         if (str && *str)
             add_history(str);
         
-        if (str == NULL) break;
+        if (!str)
+            break;
         
         JSStringRef source = JSStringCreateWithUTF8CString(str);
         free(str);
         
+        LOCK();
+        
         JSValueRef exception = NULL;
         JSValueRef *_exception = &exception;
-        
         if (JSCheckScriptSyntax(_context, source, 0, 0, _exception) && !(*_exception))
         {
             JSValueRef value = JSEvaluateScript(_context, source, 0, 0, 0, _exception);
             HANDLE_EXCEPTION(true, false);
             
             if (value && !JSValueIsUndefined(_context, value)) {
-                JSValuePrint(_context, _exception, value);
+                JS_Print(value);
                 HANDLE_EXCEPTION(true, false);
             }
         }
@@ -209,6 +183,8 @@ void* RunShell(JSContextRef _context) {
         {
             HANDLE_EXCEPTION(true, false);
         }
+        
+        UNLOCK();
         
         JSStringRelease(source);
 
@@ -227,7 +203,15 @@ int narwhal(int argc, char *argv[], char *envp[])
     JSGlobalContextRef _context = [jsc ctx];
 #else
     JSGlobalContextRef _context = JSGlobalContextCreate(NULL);
+    JSGlobalContextRetain(_context);
 #endif
+
+    pthread_mutex_t	_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+    narwhal_context.context = _context;
+    narwhal_context.mutex = &_mutex;
+    
+    LOCK();
 
     JSObjectRef global = JS_GLOBAL;
     
@@ -238,8 +222,8 @@ int narwhal(int argc, char *argv[], char *envp[])
     SET_VALUE(global, "isFile",         JS_fn(IsFile));
     SET_VALUE(global, "read",           JS_fn(Read));
     SET_VALUE(global, "requireNative",  JS_fn(RequireNative));
-    SET_VALUE(global, "ARGS",           argvToArray(_context, _exception, argc, argv));
-    SET_VALUE(global, "ENV",            envpToObject(_context, _exception, envp));
+    SET_VALUE(global, "ARGS",           CALL(argvToArray, argc, argv));
+    SET_VALUE(global, "ENV",            CALL(envpToObject, envp));
     
     // Load bootstrap.js
     char *NARWHAL_ENGINE_HOME = getenv("NARWHAL_ENGINE_HOME");
@@ -255,6 +239,8 @@ int narwhal(int argc, char *argv[], char *envp[])
     JSEvaluateScript(_context, bootstrapSource, 0, 0, 0, _exception);
     JSStringRelease(bootstrapSource);
     HANDLE_EXCEPTION(true, true);
+    
+    UNLOCK();
     
     RunShell(_context);
 
