@@ -1,8 +1,11 @@
 bin
-lib/*.dylib
-lib/*.dylib.dSYM
-lib/*.so
-lib/*.dll
+*.dylib
+*.dylib.dSYM
+*.so
+*.dll
+*.o
+*.s
+*.ii
 deps
 frameworks
 .DS_Store
