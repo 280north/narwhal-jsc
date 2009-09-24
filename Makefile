@@ -34,6 +34,14 @@ jsc-jscocoa: $(SOURCE)
 		-framework JSCocoa -framework Foundation -ObjC
 
 modules: $(MODULES)
+
+mongoose.o: mongoose.c
+	gcc $(CPPFLAGS) -W -Wall -std=c99 -pedantic -fomit-frame-pointer -c mongoose.c
+
+lib/mongoose.dylib: src/mongoose.cc mongoose.o
+	mkdir -p `dirname $@`
+	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(LIBS) mongoose.o
+	install_name_tool -change "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore" "@executable_path/../frameworks/JavaScriptCore.framework/JavaScriptCore" $@
 	
 lib/%.dylib: src/%.cc
 	mkdir -p `dirname $@`
