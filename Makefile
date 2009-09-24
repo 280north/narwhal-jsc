@@ -1,5 +1,5 @@
 CPP       =g++
-CPPFLAGS  =-g -arch i386 #-save-temps
+CPPFLAGS  =-g -arch i386 -O0 #-save-temps
 
 FRAMEWORKS_DIR=frameworks
 
@@ -10,8 +10,9 @@ MODULES   =$(patsubst %.cc,%.dylib,$(patsubst src/%,lib/%,$(wildcard src/*.cc)))
 SOURCE    =narwhal-jsc.c
 EXECUTABLE=bin/narwhal-jsc
 
+JSCORE_CONFIG=Debug
 JSCORE_FRAMEWORK=$(FRAMEWORKS_DIR)/JavaScriptCore.framework
-JSCORE_BUILD=deps/JavaScriptCore/build/Production/JavaScriptCore.framework
+JSCORE_BUILD=deps/JavaScriptCore/build/$(JSCORE_CONFIG)/JavaScriptCore.framework
 JSCORE_CHECKOUT=deps/JavaScriptCore
 
 JSCOCOA_FRAMEWORK=$(FRAMEWORKS_DIR)/JSCocoa.framework
@@ -46,7 +47,7 @@ $(JSCORE_FRAMEWORK): $(JSCORE_BUILD)
 	cp -r $< $@
 	install_name_tool -id "@executable_path/../$(FRAMEWORKS_DIR)/JavaScriptCore.framework/JavaScriptCore" $@/JavaScriptCore
 $(JSCORE_BUILD): $(JSCORE_CHECKOUT)
-	cd deps/JavaScriptCore && xcodebuild -target JavaScriptCore
+	cd deps/JavaScriptCore && xcodebuild -target JavaScriptCore -configuration $(JSCORE_CONFIG)
 $(JSCORE_CHECKOUT):
 	mkdir -p `dirname $@`
 	svn checkout http://svn.webkit.org/repository/webkit/trunk/JavaScriptCore $@
