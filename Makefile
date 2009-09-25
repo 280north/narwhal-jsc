@@ -43,12 +43,15 @@ lib/mongoose.dylib: src/mongoose.cc mongoose.o
 	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(LIBS) mongoose.o
 	install_name_tool -change "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore" "@executable_path/../frameworks/JavaScriptCore.framework/JavaScriptCore" $@
 
-http-parser/http_parser.o:
-	cd http-parser && make http_parser.o
+deps/http-parser/http_parser.o: deps/http-parser
+	cd deps/http-parser && make http_parser.o
 
-lib/http-server.dylib: src/http-server.cc http-parser/http_parser.o
+deps/http-parser:
+	git clone git://github.com/ry/http-parser.git $@
+
+lib/jill.dylib: src/jill.cc deps/http-parser/http_parser.o
 	mkdir -p `dirname $@`
-	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(LIBS) http-parser/http_parser.o
+	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(LIBS) deps/http-parser/http_parser.o
 	install_name_tool -change "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore" "@executable_path/../frameworks/JavaScriptCore.framework/JavaScriptCore" $@
 	
 lib/%.dylib: src/%.cc
