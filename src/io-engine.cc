@@ -169,6 +169,19 @@ CONSTRUCTOR(TextInputStream_constructor)
 }
 END
 
+DESTRUCTOR(TextInputStream_finalize)
+{
+    GET_INTERNAL(TextInputStreamPrivate*, data, object);
+    
+    if (data) {
+        iconv_close(data->cd);
+        if (data->inBuffer)
+            free(data->inBuffer);
+        free(data);
+    }
+}
+END
+    
 FUNCTION(TextInputStream_read)
 {
     size_t numChars = 0;
@@ -230,12 +243,15 @@ FUNCTION(TextInputStream_read)
         } else if (errno == EILSEQ) {
             // TODO: gracefully handle this case.
             // Illegal character or shift sequence
+            free(outBuffer);
             THROW("Conversion error (Illegal character or shift sequence)");
         } else if (errno == EBADF) {
             // Invalid conversion descriptor
+            free(outBuffer);
             THROW("Conversion error (Invalid conversion descriptor)");
         } else {
             // This errno is not defined
+            free(outBuffer);
             THROW("Conversion error (unknown)");
         }
     }
@@ -246,7 +262,10 @@ FUNCTION(TextInputStream_read)
     fclose(tmp);
     //*/
     
-    return JS_str_utf16(outBuffer, outBufferUsed);
+    JSValueRef result = JS_str_utf16(outBuffer, outBufferUsed);
+    free(outBuffer);
+    
+    return result;
 }
 END
 
@@ -361,7 +380,7 @@ JSClassRef TextInputStream_class(JSContextRef _context)
         JSClassDefinition definition = kJSClassDefinitionEmpty;
         definition.className = "TextInputStream"; 
         definition.staticFunctions = staticFuctions;
-        //definition.finalize = TextInputStream_finalize;
+        definition.finalize = TextInputStream_finalize;
         definition.callAsConstructor = TextInputStream_constructor;
 
         jsClass = JSClassCreate(&definition);

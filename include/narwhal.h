@@ -318,13 +318,26 @@ struct __NarwhalContext {
 extern NarwhalContext narwhal_context;
 
 #define LOCK() \
-    DEBUG("locking %p (%d)\n", narwhal_context.mutex, pthread_self()); \
-    pthread_mutex_lock(narwhal_context.mutex); \
-    DEBUG("locked %p (%d)\n", narwhal_context.mutex, pthread_self());
+    {DEBUG("locking %p (%lu)\n", narwhal_context.mutex, (unsigned long)pthread_self()) \
+    int ret = pthread_mutex_lock(narwhal_context.mutex); \
+    if (ret) fprintf(stderr, "pthread_mutex_lock error: %d", ret); \
+    else {DEBUG("locked %p (%lu)\n", narwhal_context.mutex, (unsigned long)pthread_self())} };
 
 #define UNLOCK() \
-    DEBUG("unlocking %p (%d)\n", narwhal_context.mutex, pthread_self()); \
-    pthread_mutex_unlock(narwhal_context.mutex); \
-    DEBUG("unlocked %p (%d)\n", narwhal_context.mutex, pthread_self());
+    {DEBUG("unlocking %p (%lu)\n", narwhal_context.mutex, (unsigned long)pthread_self()) \
+    int ret = pthread_mutex_unlock(narwhal_context.mutex); \
+    if (ret) fprintf(stderr, "pthread_mutex_unlock error: %d", ret); \
+    else {DEBUG("unlocked %p (%lu)\n", narwhal_context.mutex, (unsigned long)pthread_self())}};
+
+JSClassRef Custom_class(JSContextRef _context)
+{
+    static JSClassRef jsClass;
+    if (!jsClass)
+    {
+        JSClassDefinition definition = kJSClassDefinitionEmpty;
+        jsClass = JSClassCreate(&definition);
+    }
+    return jsClass;
+}
 
 #endif

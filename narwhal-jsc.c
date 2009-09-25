@@ -236,9 +236,13 @@ int narwhal(int argc, char *argv[], char *envp[])
         printf("Error reading bootstrap.js\n");
         return 1;
     }
+    
     JSEvaluateScript(_context, bootstrapSource, 0, 0, 0, _exception);
+    if (*_exception) {
+        JS_Print(*_exception);
+    }
+    
     JSStringRelease(bootstrapSource);
-    HANDLE_EXCEPTION(true, true);
     
     UNLOCK();
     
