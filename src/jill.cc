@@ -21,19 +21,19 @@ typedef struct _client_data {
     JSObjectRef app;
     
     char    *path;
-    ssize_t pathPos;
+    ssize_t pathLen;
     
     char    *query;
-    ssize_t queryPos;
+    ssize_t queryLen;
     
     char    *hName;
-    ssize_t hNamePos;
+    ssize_t hNameLen;
     
     char    *hValue;
-    ssize_t hValuePos;
+    ssize_t hValueLen;
     
     char    *body;
-    ssize_t bodyPos;
+    ssize_t bodyLen;
     
     int     complete;
 } client_data;
@@ -42,23 +42,25 @@ JSValueRef processHeader(
     JSContextRef _context, JSValueRef *_exception,
     client_data *data
 ) {
-    if (data->hValuePos > 0) {
+    if (data->hValueLen > 0) {
         JSObjectRef env = data->env;
         
-        data->hName[data->hNamePos] = '\0';    
-        data->hValue[data->hValuePos] = '\0';
+        data->hName[data->hNameLen] = '\0';
+        data->hValue[data->hValueLen] = '\0';
         
-        char buffer[data->hNamePos + 5];
+        char buffer[data->hNameLen + 5];
         memcpy(buffer, "HTTP_", 5);
         char c, *dst = buffer + 5, *src = data->hName;
         while (c = *(src++))
             *(dst++) = (c == '-') ? '_' : toupper(c);
         *dst = '\0';
         
-        SET_VALUE(env, buffer, JS_str_utf8(data->hValue, data->hValuePos));
-
-        data->hNamePos = 0;
-        data->hValuePos = 0;
+        SET_VALUE(env, buffer, JS_str_utf8(data->hValue, data->hValueLen));
+        
+        data->hName = NULL;
+        data->hNameLen = 0;
+        data->hValue = NULL;
+        data->hValueLen = 0;
     }
     
     return NULL;
@@ -122,8 +124,8 @@ JSValueRef handlerWrapper(
     
     // PATH_INFO
     if (data->path) {
-        data->path[data->pathPos] = '\0';
-        SET_VALUE(env, "PATH_INFO", JS_str_utf8(data->path, data->pathPos));
+        data->path[data->pathLen] = '\0';
+        SET_VALUE(env, "PATH_INFO", JS_str_utf8(data->path, data->pathLen));
     } else {
         SET_VALUE(env, "PATH_INFO", JS_str_utf8("", 0));
     }
@@ -131,8 +133,8 @@ JSValueRef handlerWrapper(
     
     // QUERY_STRING
     if (data->query) {
-        data->query[data->queryPos] = '\0';
-        SET_VALUE(env, "QUERY_STRING", JS_str_utf8(data->query, data->queryPos));
+        data->query[data->queryLen] = '\0';
+        SET_VALUE(env, "QUERY_STRING", JS_str_utf8(data->query, data->queryLen));
     } else {
         SET_VALUE(env, "QUERY_STRING", JS_str_utf8("", 0));
     }
@@ -355,10 +357,13 @@ int on_path(http_parser *parser, const char *at, size_t length) {
     // JSContextRef _context = data->_context;
     // JSValueRef *_exception = data->_exception;
     
-    if (!data->path) data->path = (char*)malloc(1024);
-    
-    memcpy(data->path + data->pathPos, at, length);
-    data->pathPos += length;
+    if (!data->path) {
+        data->path = (char *)at;
+        data->pathLen = length;
+    }
+    else {
+         data->pathLen += length;
+    }
 
     return 0;
 }
@@ -368,10 +373,13 @@ int on_query_string(http_parser *parser, const char *at, size_t length) {
     // JSContextRef _context = data->_context;
     // JSValueRef *_exception = data->_exception;
     
-    if (!data->query) data->query = (char*)malloc(1024);
-    
-    memcpy(data->query + data->queryPos, at, length);
-    data->queryPos += length;
+    if (!data->query) {
+        data->query = (char *)at;
+        data->queryLen = length;
+    }
+    else {
+         data->queryLen += length;
+    }
     
     return 0;
 }
@@ -381,13 +389,16 @@ int on_header_field(http_parser *parser, const char *at, size_t length) {
     JSContextRef _context = data->_context;
     JSValueRef *_exception = data->_exception;
     
-    if (!data->hName) data->hName = (char*)malloc(1024);
-    
     // add header, if there's one pending
     CALL(processHeader, data);
     
-    memcpy(data->hName + data->hNamePos, at, length);
-    data->hNamePos += length;
+    if (!data->hName) {
+        data->hName = (char *)at;
+        data->hNameLen = length;
+    }
+    else {
+         data->hNameLen += length;
+    }
     
     return 0;
 }
@@ -396,11 +407,14 @@ int on_header_value(http_parser *parser, const char *at, size_t length) {
     client_data *data = (client_data *)parser->data;
     //JSContextRef _context = data->_context;
     //JSValueRef *_exception = data->_exception;
-    
-    if (!data->hValue) data->hValue = (char*)malloc(1024);
-    
-    memcpy(data->hValue + data->hValuePos, at, length);
-    data->hValuePos += length;
+
+    if (!data->hValue) {
+        data->hValue = (char *)at;
+        data->hValueLen = length;
+    }
+    else {
+        data->hValueLen += length;
+    }
     
     return 0;
 }
@@ -472,6 +486,10 @@ FUNCTION(HS_run, ARG_FN(app))
     if (listen(server_socket, backlog) < 0)
         THROW("listen error: %s", strerror(errno));
     
+    size_t bufferSize = 1024;
+    size_t bufferPosition = 0;
+    char *buffer = (char *)malloc(bufferSize);
+    
     while (1) {
         socklen_t client_addrlen = sizeof(struct sockaddr_in);
         client_socket = accept(server_socket, (struct sockaddr *)&client_address, &client_addrlen);
@@ -483,6 +501,7 @@ FUNCTION(HS_run, ARG_FN(app))
         
         client_data data;
         memset(&data, 0, sizeof(data));
+        
         data.fd = client_socket;
         data._context = _context;
         JSValueRef exception = NULL;
@@ -503,18 +522,34 @@ FUNCTION(HS_run, ARG_FN(app))
         parser.on_body             = on_body;
         parser.on_message_complete = on_message_complete;
         
-        size_t sz = 1024;
-        char buf[sz];
+        bufferPosition = 0;
         
         while (1) {
+            
+            if (bufferPosition >= bufferSize) {
+                if (bufferPosition > bufferSize) {
+                    fprintf(stderr, "bufferPosition=%d bufferSize=%d WHAT?!\n", bufferPosition, bufferSize);
+                }
+                
+                bufferSize *= 2;
+                
+                fprintf(stderr, "reallocing bufferSize=%d\n", bufferSize);
+                
+                buffer = (char *)realloc(buffer, bufferSize);
+                if (!buffer) {
+                    THROW("OOM!");
+                    close(client_socket);
+                }
+            }
+            
             // FIXME: timeout
-            ssize_t recved = recv(client_socket, buf, sz, 0);
+            ssize_t recved = recv(client_socket, buffer + bufferPosition, bufferSize - bufferPosition, 0);
             if (recved < 0) {
                 printf("recv error: %s\n", strerror(errno));
                 break;
             }
 
-            http_parser_execute(&parser, buf, recved);
+            http_parser_execute(&parser, buffer + bufferPosition, recved);
 
             if (http_parser_has_error(&parser)) {
                 printf("parse error\n");
@@ -532,12 +567,9 @@ FUNCTION(HS_run, ARG_FN(app))
             
             if (recved == 0)
                 break;
+                
+            bufferPosition += recved;
         }
-        
-        if (data.path) free(data.path);
-        if (data.query) free(data.query);
-        if (data.hName) free(data.hName);
-        if (data.hValue) free(data.hValue);
         
         close(client_socket);
     }
