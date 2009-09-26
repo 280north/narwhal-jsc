@@ -38,7 +38,7 @@ JSStringRef ReadFile(const char* name) {
     return result;
 }
 
-FUNCTION(Print)
+FUNCTION(NW_print)
 {
     size_t i;
     for (i = 0; i < ARGC; i++) {
@@ -51,7 +51,7 @@ FUNCTION(Print)
 }
 END
 
-FUNCTION(Read, ARG_UTF8(path))
+FUNCTION(NW_read, ARG_UTF8(path))
 {
     ARG_COUNT(1);
 
@@ -71,7 +71,7 @@ FUNCTION(Read, ARG_UTF8(path))
 }
 END
 
-FUNCTION(IsFile, ARG_UTF8(path))
+FUNCTION(NW_isFile, ARG_UTF8(path))
 {
     ARG_COUNT(1);
 
@@ -85,7 +85,7 @@ END
 typedef JSObjectCallAsFunctionCallback factory_t;
 typedef const char *(*getModuleName_t)(NarwhalContext *);
 
-FUNCTION(RequireNative, ARG_UTF8(topId), ARG_UTF8(path))
+FUNCTION(NW_requireNative, ARG_UTF8(topId), ARG_UTF8(path))
 {
     ARG_COUNT(2)
     
@@ -218,10 +218,10 @@ int narwhal(int argc, char *argv[], char *envp[])
     JSValueRef exception = NULL;
     JSValueRef *_exception = &exception;
 
-    SET_VALUE(global, "print",          JS_fn(Print));
-    SET_VALUE(global, "isFile",         JS_fn(IsFile));
-    SET_VALUE(global, "read",           JS_fn(Read));
-    SET_VALUE(global, "requireNative",  JS_fn(RequireNative));
+    SET_VALUE(global, "print",          JS_fn(NW_print));
+    SET_VALUE(global, "isFile",         JS_fn(NW_isFile));
+    SET_VALUE(global, "read",           JS_fn(NW_read));
+    SET_VALUE(global, "requireNative",  JS_fn(NW_requireNative));
     SET_VALUE(global, "ARGS",           CALL(argvToArray, argc, argv));
     SET_VALUE(global, "ENV",            CALL(envpToObject, envp));
     

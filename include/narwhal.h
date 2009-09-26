@@ -164,8 +164,10 @@ void JSValuePrint(JSContextRef _context, JSValueRef *_exception, JSValueRef valu
 #define JS_str_utf8(str, len) JSValueMakeStringWithUTF8CString(_context, str)    
 #define JS_str_utf16(str, len) JSValueMakeStringWithUTF16(_context, (JSChar*)str, (len)/sizeof(JSChar))
 
+
 #define JS_obj(value)   JSValueToObject(_context, value, _exception)
 #define JS_fn(f)        JSObjectMakeFunctionWithCallback(_context, NULL, f)
+#define JS_array(count, array) JSObjectMakeArray(_context, count, array, _exception)
 
 #define GET_VALUE(object, name) _GET_VALUE(_context, _exception, object, name)
 JSValueRef _GET_VALUE(JSContextRef _context, JSValueRef *_exception, JSObjectRef object, const char *name) {
@@ -339,5 +341,14 @@ JSClassRef Custom_class(JSContextRef _context)
     }
     return jsClass;
 }
+
+
+extern JSObjectRef Require;
+extern JSObjectRef Exports;
+extern JSObjectRef Module;
+extern JSObjectRef System;
+extern JSObjectRef Print;
+extern JSContextRef _context;
+extern NarwhalContext narwhal_context;
 
 #endif

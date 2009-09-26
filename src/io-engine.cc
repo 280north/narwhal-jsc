@@ -8,9 +8,6 @@
 #include <io-engine.h>
 #include <binary-engine.h>
 
-JSClassRef IO_class(JSContextRef _context);
-JSClassRef TextInputStream_class(JSContextRef _context);
-
 CONSTRUCTOR(IO_constructor)
 {
     IOPrivate *data = (IOPrivate*)malloc(sizeof(IOPrivate));
@@ -333,7 +330,7 @@ NARWHAL_MODULE(io_engine)
 END_NARWHAL_MODULE
 
 
-JSClassRef IO_class(JSContextRef _context)
+extern "C" JSClassRef IO_class(JSContextRef _context)
 {
     static JSClassRef jsClass;
     if (!jsClass)
@@ -358,7 +355,7 @@ JSClassRef IO_class(JSContextRef _context)
     return jsClass;
 }
 
-JSClassRef TextInputStream_class(JSContextRef _context)
+extern "C" JSClassRef TextInputStream_class(JSContextRef _context)
 {
     static JSClassRef jsClass;
     if (!jsClass)

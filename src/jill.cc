@@ -7,6 +7,7 @@
 #include "../deps/http-parser/http_parser.h"
 
 #include <binary-engine.h>
+#include <io-engine.h>
 
 typedef struct _client_data {
     int     fd;
@@ -31,65 +32,19 @@ typedef struct _client_data {
     char    *hValue;
     ssize_t hValuePos;
     
+    char    *body;
+    ssize_t bodyPos;
+    
     int     complete;
 } client_data;
 
-int on_message_begin(http_parser *parser) {
-    client_data *data = (client_data *)parser->data;
-    JSContextRef _context = data->_context;
-    JSValueRef *_exception = data->_exception;
-    
-    data->env = JSObjectMake(_context, NULL, NULL);
-    
-    return 0;
-}
-int on_path(http_parser *parser, const char *at, size_t length) {
-    client_data *data = (client_data *)parser->data;
-    JSContextRef _context = data->_context;
-    JSValueRef *_exception = data->_exception;
-    
-    if (!data->path) data->path = (char*)malloc(1024);
-    
-    memcpy(data->path + data->pathPos, at, length);
-    data->pathPos += length;
-
-    return 0;
-}
-int on_query_string(http_parser *parser, const char *at, size_t length) {
-    client_data *data = (client_data *)parser->data;
-    JSContextRef _context = data->_context;
-    JSValueRef *_exception = data->_exception;
-    
-    if (!data->query) data->query = (char*)malloc(1024);
-    
-    memcpy(data->query + data->queryPos, at, length);
-    data->queryPos += length;
-    
-    return 0;
-}
-/*
-int on_uri(http_parser*, const char *at, size_t length) {
-    printf("on_uri\n");
-    fwrite(at, length, 1, stdout);
-    printf("\n");
-    return 0;
-}
-int on_fragment(http_parser*, const char *at, size_t length) {
-    printf("on_fragment\n");
-    fwrite(at, length, 1, stdout);
-    printf("\n");
-    return 0;
-}
-*/
-int on_header_field(http_parser *parser, const char *at, size_t length) {
-    client_data *data = (client_data *)parser->data;
-    JSContextRef _context = data->_context;
-    JSValueRef *_exception = data->_exception;
-    JSObjectRef env = data->env;
-    
-    if (!data->hName) data->hName = (char*)malloc(1024);
-    
+JSValueRef processHeader(
+    JSContextRef _context, JSValueRef *_exception,
+    client_data *data
+) {
     if (data->hValuePos > 0) {
+        JSObjectRef env = data->env;
+        
         data->hName[data->hNamePos] = '\0';    
         data->hValue[data->hValuePos] = '\0';
         
@@ -106,22 +61,7 @@ int on_header_field(http_parser *parser, const char *at, size_t length) {
         data->hValuePos = 0;
     }
     
-    memcpy(data->hName + data->hNamePos, at, length);
-    data->hNamePos += length;
-    
-    return 0;
-}
-int on_header_value(http_parser *parser, const char *at, size_t length) {
-    client_data *data = (client_data *)parser->data;
-    JSContextRef _context = data->_context;
-    JSValueRef *_exception = data->_exception;
-    
-    if (!data->hValue) data->hValue = (char*)malloc(1024);
-    
-    memcpy(data->hValue + data->hValuePos, at, length);
-    data->hValuePos += length;
-    
-    return 0;
+    return NULL;
 }
 
 FUNCTION(HS_writer)
@@ -163,7 +103,6 @@ FUNCTION(HS_writer)
     send(data->fd, bytesData->buffer, bytesData->length, 0);
     
     return JS_undefined;
-//*/
 }
 END
 
@@ -174,9 +113,14 @@ JSValueRef handlerWrapper(
     client_data *data = (client_data *)parser->data;
     JSObjectRef env = data->env;
     
+    // add the final header
+    CALL(processHeader, data);
+    
+    // SCRIPT_NAME
     SET_VALUE(env, "SCRIPT_NAME", JS_str_utf8("", 0));
     HANDLE_EXCEPTION(true, true);
     
+    // PATH_INFO
     if (data->path) {
         data->path[data->pathPos] = '\0';
         SET_VALUE(env, "PATH_INFO", JS_str_utf8(data->path, data->pathPos));
@@ -185,6 +129,16 @@ JSValueRef handlerWrapper(
     }
     HANDLE_EXCEPTION(true, true);
     
+    // QUERY_STRING
+    if (data->query) {
+        data->query[data->queryPos] = '\0';
+        SET_VALUE(env, "QUERY_STRING", JS_str_utf8(data->query, data->queryPos));
+    } else {
+        SET_VALUE(env, "QUERY_STRING", JS_str_utf8("", 0));
+    }
+    HANDLE_EXCEPTION(true, true);
+    
+    // REQUEST_METHOD
     char *methodName = NULL;
     switch (parser->method) {
         case HTTP_COPY      : methodName = "COPY"; break;
@@ -203,44 +157,65 @@ JSValueRef handlerWrapper(
         case HTTP_GET       :
         default             : methodName = "GET"; break;
     }
-    JSValueRef method = JS_str_utf8(methodName, strlen(methodName));
-    
-    SET_VALUE(env, "REQUEST_METHOD", method);
+    SET_VALUE(env, "REQUEST_METHOD", JS_str_utf8(methodName, strlen(methodName)));
     HANDLE_EXCEPTION(true, true);
     
-    if (data->query) {
-        data->query[data->queryPos] = '\0';
-        SET_VALUE(env, "QUERY_STRING", JS_str_utf8(data->query, data->queryPos));
-    } else {
-        SET_VALUE(env, "QUERY_STRING", JS_str_utf8("", 0));
+    // SERVER_PROTOCOL
+    char *versionName = NULL;
+    switch (parser->version) {
+        case HTTP_VERSION_09    : versionName = "HTTP/0.9"; break;
+        case HTTP_VERSION_10    : versionName = "HTTP/1.0"; break;
+        case HTTP_VERSION_11    : 
+        case HTTP_VERSION_OTHER : 
+        default                 : versionName = "HTTP/1.1"; break;
     }
+    SET_VALUE(env, "SERVER_PROTOCOL", JS_str_utf8(versionName, strlen(versionName)));
     HANDLE_EXCEPTION(true, true);
-    //SET_VALUE(env, "REMOTE_USER", JS_str_utf8(info->remote_user, strlen(info->remote_user)));
-    //HANDLE_EXCEPTION(true, true);
     
+    // SERVER_NAME
     SET_VALUE(env, "SERVER_NAME", JS_str_utf8("", 0));
     HANDLE_EXCEPTION(true, true);
+    
+    // SERVER_PORT
     SET_VALUE(env, "SERVER_PORT", JS_str_utf8("", 0));
     HANDLE_EXCEPTION(true, true);
     
-    //snprintf(buffer, sizeof(buffer), "HTTP/%s", info->http_version);
-    SET_VALUE(env, "HTTP_VERSION", JS_str_utf8("HTTP/1.1", strlen("HTTP/1.1")));
-    HANDLE_EXCEPTION(true, true);
-    
-    //long ip = info->remote_ip;
-    //snprintf(buffer, sizeof(buffer), "%hu.%hu.%hu.%hu", (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF);
-    //SET_VALUE(env, "REMOTE_ADDRESS", JS_str_utf8(buffer, strlen(buffer)));
+    // REMOTE_USER
+    //SET_VALUE(env, "REMOTE_USER", JS_str_utf8(info->remote_user, strlen(info->remote_user)));
     //HANDLE_EXCEPTION(true, true);
     
-    //SET_VALUE(env, "jsgi.version",      );
+    // REMOTE_ADDR
+    //long ip = info->remote_ip;
+    //snprintf(buffer, sizeof(buffer), "%hu.%hu.%hu.%hu", (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF);
+    //SET_VALUE(env, "REMOTE_ADDR", JS_str_utf8(buffer, strlen(buffer)));
+    //HANDLE_EXCEPTION(true, true);
+    
+    // jsgi.version
+    ARGS_ARRAY(argvVersion, JS_int(0), JS_int(2));
+    SET_VALUE(env, "jsgi.version", JS_array(2, argvVersion));
+    HANDLE_EXCEPTION(true, true);
+    
+    // jsgi.erros
+    SET_VALUE(env, "jsgi.errors", GET_OBJECT(System, "stderr"));
+    HANDLE_EXCEPTION(true, true);
+    
+    // jsgi.input
     //SET_VALUE(env, "jsgi.input",        );
-    //SET_VALUE(env, "jsgi.errors",       );
+    //HANDLE_EXCEPTION(true, true);
+    
+    // jsgi.multithread
     SET_VALUE(env, "jsgi.multithread",  JS_bool(0));
     HANDLE_EXCEPTION(true, true);
+    
+    // jsgi.multiprocess
     SET_VALUE(env, "jsgi.multiprocess", JS_bool(1));
     HANDLE_EXCEPTION(true, true);
+    
+    // jsgi.run_once
     SET_VALUE(env, "jsgi.run_once",     JS_bool(0));
     HANDLE_EXCEPTION(true, true);
+    
+    // jsgi.url_scheme
     SET_VALUE(env, "jsgi.url_scheme",   JS_str_utf8("http", strlen("http")));
     HANDLE_EXCEPTION(true, true);
     
@@ -345,7 +320,7 @@ JSValueRef handlerWrapper(
     return 0;
 }
 
-int on_headers_complete(http_parser *parser) {
+int dispatch(http_parser *parser) {
     client_data *data = (client_data *)parser->data;
     JSContextRef _context = data->_context;
     JSValueRef *_exception = data->_exception;
@@ -363,22 +338,101 @@ int on_headers_complete(http_parser *parser) {
         printf("]");
         //return 1;
     }
+}
+
+int on_message_begin(http_parser *parser) {
+    client_data *data = (client_data *)parser->data;
+    JSContextRef _context = data->_context;
+    JSValueRef *_exception = data->_exception;
+    
+    data->env = JSObjectMake(_context, NULL, NULL);
     
     return 0;
 }
 
+int on_path(http_parser *parser, const char *at, size_t length) {
+    client_data *data = (client_data *)parser->data;
+    // JSContextRef _context = data->_context;
+    // JSValueRef *_exception = data->_exception;
+    
+    if (!data->path) data->path = (char*)malloc(1024);
+    
+    memcpy(data->path + data->pathPos, at, length);
+    data->pathPos += length;
+
+    return 0;
+}
+
+int on_query_string(http_parser *parser, const char *at, size_t length) {
+    client_data *data = (client_data *)parser->data;
+    // JSContextRef _context = data->_context;
+    // JSValueRef *_exception = data->_exception;
+    
+    if (!data->query) data->query = (char*)malloc(1024);
+    
+    memcpy(data->query + data->queryPos, at, length);
+    data->queryPos += length;
+    
+    return 0;
+}
+
+int on_header_field(http_parser *parser, const char *at, size_t length) {
+    client_data *data = (client_data *)parser->data;
+    JSContextRef _context = data->_context;
+    JSValueRef *_exception = data->_exception;
+    
+    if (!data->hName) data->hName = (char*)malloc(1024);
+    
+    // add header, if there's one pending
+    CALL(processHeader, data);
+    
+    memcpy(data->hName + data->hNamePos, at, length);
+    data->hNamePos += length;
+    
+    return 0;
+}
+
+int on_header_value(http_parser *parser, const char *at, size_t length) {
+    client_data *data = (client_data *)parser->data;
+    //JSContextRef _context = data->_context;
+    //JSValueRef *_exception = data->_exception;
+    
+    if (!data->hValue) data->hValue = (char*)malloc(1024);
+    
+    memcpy(data->hValue + data->hValuePos, at, length);
+    data->hValuePos += length;
+    
+    return 0;
+}
+
+int on_headers_complete(http_parser *parser) {
+    //client_data *data = (client_data *)parser->data;
+    //JSContextRef _context = data->_context;
+    //JSValueRef *_exception = data->_exception;
+    
+    //printf("on_headers_complete\n");
+    
+    dispatch(parser);
+    
+    return 0;
+}
 
 int on_body(http_parser *parser, const char *at, size_t length) {
-    client_data *data = (client_data *)parser->data;
-    JSContextRef _context = data->_context;
-    JSValueRef *_exception = data->_exception;
+    //client_data *data = (client_data *)parser->data;
+    //JSContextRef _context = data->_context;
+    //JSValueRef *_exception = data->_exception;
+    
+    //printf("on_body: %d\n", length);
     
     return 0;
 }
+
 int on_message_complete(http_parser *parser) {
-    client_data *data = (client_data *)parser->data;
-    JSContextRef _context = data->_context;
-    JSValueRef *_exception = data->_exception;
+    //client_data *data = (client_data *)parser->data;
+    //JSContextRef _context = data->_context;
+    //JSValueRef *_exception = data->_exception;
+    
+    //printf("on_message_complete\n");
     
     return 0;
 }
@@ -443,8 +497,6 @@ FUNCTION(HS_run, ARG_FN(app))
         parser.on_message_begin    = on_message_begin;
         parser.on_path             = on_path;
         parser.on_query_string     = on_query_string;
-        //parser.on_uri              = on_uri;
-        //parser.on_fragment         = on_fragment;
         parser.on_header_field     = on_header_field;
         parser.on_header_value     = on_header_value;
         parser.on_headers_complete = on_headers_complete;
@@ -459,7 +511,6 @@ FUNCTION(HS_run, ARG_FN(app))
             ssize_t recved = recv(client_socket, buf, sz, 0);
             if (recved < 0) {
                 printf("recv error: %s\n", strerror(errno));
-                close(server_socket);
                 break;
             }
 
@@ -467,12 +518,13 @@ FUNCTION(HS_run, ARG_FN(app))
 
             if (http_parser_has_error(&parser)) {
                 printf("parse error\n");
-                close(server_socket);
                 if (*data._exception) {
                     JS_Print(*data._exception);
                 }
                 break;
             }
+            
+            //printf("data.complete=%d recved=%d\n", data.complete, recved);
             
             if (data.complete) {
                 break;

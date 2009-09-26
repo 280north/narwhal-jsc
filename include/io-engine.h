@@ -1,23 +1,23 @@
 #ifndef __IO_ENGINE__
 #define __IO_ENGINE__
 
-typedef struct __IOPrivate IOPrivate;
+#include <iconv.h>
 
-struct __IOPrivate {
+typedef struct __IOPrivate {
     int input;
     int output;
-};
+} IOPrivate;
 
-
-typedef struct __TextInputStreamPrivate TextInputStreamPrivate;
-
-struct __TextInputStreamPrivate {
+typedef struct __TextInputStreamPrivate {
     int input;
     iconv_t cd;
     
     char *inBuffer;
     size_t inBufferSize;
     size_t inBufferUsed;
-};
+} TextInputStreamPrivate;
+
+extern "C" JSClassRef IO_class(JSContextRef _context);
+extern "C" JSClassRef TextInputStream_class(JSContextRef _context);
 
 #endif
