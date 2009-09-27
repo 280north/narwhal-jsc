@@ -14,6 +14,11 @@
 #import <JSCocoa/JSCocoa.h>
 #endif
 
+#ifdef WEBKIT
+#import <Foundation/Foundation.h>
+#import <WebKit/WebKit.h>
+#endif
+
 NarwhalContext narwhal_context;
 
 // Reads a file into a v8 string.
@@ -197,7 +202,13 @@ void* RunShell(JSContextRef _context) {
 
 int narwhal(int argc, char *argv[], char *envp[])
 {
-#ifdef JSCOCOA
+#ifdef WEBKIT
+    NSAutoreleasePool *pool = [NSAutoreleasePool new];
+
+    WebView * webView = [[WebView alloc] init];
+
+    JSGlobalContextRef _context = [[webView mainFrame] globalContext];
+#elif defined(JSCOCOA)
     NSAutoreleasePool *pool = [NSAutoreleasePool new];
     JSCocoaController* jsc = [JSCocoa new];
     JSGlobalContextRef _context = [jsc ctx];
@@ -246,9 +257,11 @@ int narwhal(int argc, char *argv[], char *envp[])
     
     UNLOCK();
     
-    RunShell(_context);
+    //RunShell(_context);
 
-#ifdef JSCOCOA
+#ifdef WEBKIT
+    [pool drain];
+#elif defined(JSCOCOA)
     [pool drain];
 #endif
 }
