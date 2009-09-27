@@ -350,5 +350,7 @@ extern JSObjectRef System;
 extern JSObjectRef Print;
 extern JSContextRef _context;
 extern NarwhalContext narwhal_context;
+extern void print(const char * string);
+extern JSObjectRef require(const char *id);
 
 #endif

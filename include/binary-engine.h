@@ -8,4 +8,6 @@ struct __BytesPrivate {
     size_t length;
 };
 
+JSObjectRef Bytes_new(JSContextRef _context, JSValueRef *_exception, char* buffer, int length);
+
 #endif

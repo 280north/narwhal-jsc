@@ -49,9 +49,9 @@ deps/http-parser/http_parser.o: deps/http-parser
 deps/http-parser:
 	git clone git://github.com/ry/http-parser.git $@
 
-lib/jill.dylib: src/jill.cc deps/http-parser/http_parser.o lib/io-engine.dylib
+lib/jill.dylib: src/jill.cc deps/http-parser/http_parser.o lib/io-engine.dylib lib/binary-engine.dylib
 	mkdir -p `dirname $@`
-	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(LIBS) deps/http-parser/http_parser.o lib/io-engine.dylib
+	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(LIBS) deps/http-parser/http_parser.o lib/io-engine.dylib lib/binary-engine.dylib
 	install_name_tool -change "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore" "@executable_path/../frameworks/JavaScriptCore.framework/JavaScriptCore" $@
 	
 lib/%.dylib: src/%.cc

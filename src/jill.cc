@@ -9,6 +9,9 @@
 #include <binary-engine.h>
 #include <io-engine.h>
 
+JSObjectRef ByteIO;
+JSObjectRef ByteString;
+
 typedef struct _client_data {
     int     fd;
     size_t  len;
@@ -55,7 +58,11 @@ JSValueRef processHeader(
             *(dst++) = (c == '-') ? '_' : toupper(c);
         *dst = '\0';
         
-        SET_VALUE(env, buffer, JS_str_utf8(data->hValue, data->hValueLen));
+        if (!strcmp("HTTP_CONTENT_LENGTH", buffer) || !strcmp("HTTP_CONTENT_TYPE", buffer)) {
+            SET_VALUE(env, buffer + 5, JS_str_utf8(data->hValue, data->hValueLen));
+        } else {
+            SET_VALUE(env, buffer, JS_str_utf8(data->hValue, data->hValueLen));
+        }
         
         data->hName = NULL;
         data->hNameLen = 0;
@@ -102,7 +109,8 @@ FUNCTION(HS_writer)
     
     GET_INTERNAL(BytesPrivate*, bytesData, _bytes);
 
-    send(data->fd, bytesData->buffer, bytesData->length, 0);
+    if (send(data->fd, bytesData->buffer, bytesData->length, 0) < 0)
+        THROW("Client closed connection");
     
     return JS_undefined;
 }
@@ -202,8 +210,27 @@ JSValueRef handlerWrapper(
     HANDLE_EXCEPTION(true, true);
     
     // jsgi.input
-    //SET_VALUE(env, "jsgi.input",        );
-    //HANDLE_EXCEPTION(true, true);
+    if (!data->body) {
+        data->body = "";
+        data->bodyLen = 0;
+    } else {
+        data->body[data->bodyLen] = '\0';
+    }
+
+    JSObjectRef bytes = CALL(Bytes_new, data->body, data->bodyLen);
+    HANDLE_EXCEPTION(true, true);
+    
+    // new ByeString(bytes, 0, 0)
+    ARGS_ARRAY(byteStringArgs, bytes, JS_int(0), JS_int(data->bodyLen));
+    JSObjectRef byteString = CALL_AS_CONSTRUCTOR(ByteString, 3, byteStringArgs);
+    
+    // new ByteIO(byteString)
+    ARGS_ARRAY(byteIoArgs, byteString);
+    JSObjectRef input = CALL_AS_CONSTRUCTOR(ByteIO, 1, byteIoArgs);
+    HANDLE_EXCEPTION(true, true);
+    
+    SET_VALUE(env, "jsgi.input", input);
+    HANDLE_EXCEPTION(true, true);
     
     // jsgi.multithread
     SET_VALUE(env, "jsgi.multithread",  JS_bool(0));
@@ -231,15 +258,20 @@ JSValueRef handlerWrapper(
     if (*_exception) {
         JSValuePrint(_context, NULL, *_exception);
         snprintf(buffer, sizeof(buffer), "%s %s\r\n", "HTTP/1.1", "500 Internal Server Error");
-        send(data->fd, buffer, strlen(buffer), 0);
+        if (send(data->fd, buffer, strlen(buffer), 0) < 0)
+            THROW("Client closed connection");
         snprintf(buffer, sizeof(buffer), "%s: %s\r\n", "Content-Type", "text/plain");
-        send(data->fd, buffer, strlen(buffer), 0);
+        if (send(data->fd, buffer, strlen(buffer), 0) < 0)
+            THROW("Client closed connection");
         snprintf(buffer, sizeof(buffer), "%s: %s\r\n", "Connection", "close");
-        send(data->fd, buffer, strlen(buffer), 0);
+        if (send(data->fd, buffer, strlen(buffer), 0) < 0)
+            THROW("Client closed connection");
         snprintf(buffer, sizeof(buffer), "\r\n");
-        send(data->fd, buffer, strlen(buffer), 0);
+        if (send(data->fd, buffer, strlen(buffer), 0) < 0)
+            THROW("Client closed connection");
         snprintf(buffer, sizeof(buffer), "%s", "500 Internal Server Error");
-        send(data->fd, buffer, strlen(buffer), 0);
+        if (send(data->fd, buffer, strlen(buffer), 0) < 0)
+            THROW("Client closed connection");
         return NULL;
     }
     
@@ -251,7 +283,8 @@ JSValueRef handlerWrapper(
     HANDLE_EXCEPTION(true, true);
     
     snprintf(buffer, sizeof(buffer), "%s %d\r\n", "HTTP/1.1", status);
-    send(data->fd, buffer, strlen(buffer), 0);
+    if (send(data->fd, buffer, strlen(buffer), 0) < 0)
+        THROW("Client closed connection");
     
     //fprintf(f, "%s %d\r\n", "HTTP/1.1", status);
     
@@ -280,7 +313,8 @@ JSValueRef handlerWrapper(
             
             *end = '\0';
             snprintf(buffer, sizeof(buffer), "%s: %s\r\n", name, start);
-            send(data->fd, buffer, strlen(buffer), 0);
+            if (send(data->fd, buffer, strlen(buffer), 0) < 0)
+                THROW("Client closed connection");
             *end = orig;
 
             if (orig == '\0') break;
@@ -289,7 +323,8 @@ JSValueRef handlerWrapper(
     }
     
     snprintf(buffer, sizeof(buffer), "\r\n");
-    send(data->fd, buffer, strlen(buffer), 0);
+    if (send(data->fd, buffer, strlen(buffer), 0) < 0)
+        THROW("Client closed connection");
     
     // BODY:
     JSObjectRef body = GET_OBJECT(result, "body");
@@ -333,11 +368,10 @@ int dispatch(http_parser *parser) {
     data->complete = 1;
     
     if (*_exception) {
-        printf("ERROR:[");
+        printf("ERROR:");
         JSValueRef exceptionToPrint = *_exception;
         *_exception = NULL;
         JS_Print(exceptionToPrint);
-        printf("]");
         //return 1;
     }
 }
@@ -426,17 +460,25 @@ int on_headers_complete(http_parser *parser) {
     
     //printf("on_headers_complete\n");
     
-    dispatch(parser);
+    //dispatch(parser);
     
     return 0;
 }
 
 int on_body(http_parser *parser, const char *at, size_t length) {
-    //client_data *data = (client_data *)parser->data;
+    client_data *data = (client_data *)parser->data;
     //JSContextRef _context = data->_context;
     //JSValueRef *_exception = data->_exception;
     
     //printf("on_body: %d\n", length);
+    
+    if (!data->body) {
+        data->body = (char *)at;
+        data->bodyLen = length;
+    }
+    else {
+         data->bodyLen += length;
+    }
     
     return 0;
 }
@@ -447,6 +489,7 @@ int on_message_complete(http_parser *parser) {
     //JSValueRef *_exception = data->_exception;
     
     //printf("on_message_complete\n");
+    dispatch(parser);
     
     return 0;
 }
@@ -474,7 +517,8 @@ FUNCTION(HS_run, ARG_FN(app))
         THROW("socket error: %s", strerror(errno));
     
     int optval = 1;
-    setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
+    // free up the bound port immediately
+    setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
 
     server_address.sin_family = AF_INET;
     server_address.sin_addr.s_addr = INADDR_ANY;
@@ -498,6 +542,10 @@ FUNCTION(HS_run, ARG_FN(app))
             close(server_socket);
             THROW("accept error: %s", strerror(errno));
         }
+        
+        int optval = 1;
+        // don't signal SIGPIPE if a socket is closed early
+        setsockopt(client_socket, SOL_SOCKET, SO_NOSIGPIPE, (void *)&optval, sizeof(optval));
         
         client_data data;
         memset(&data, 0, sizeof(data));
@@ -581,6 +629,18 @@ END
 NARWHAL_MODULE(http_server_engine)
 {
     EXPORTS("run", JS_fn(HS_run));
+    
+    JSObjectRef io = require("io");
+    HANDLE_EXCEPTION(true, true);
+    
+    ByteIO = GET_OBJECT(io, "ByteIO");
+    HANDLE_EXCEPTION(true, true);
+    
+    JSObjectRef binary = require("binary");
+    HANDLE_EXCEPTION(true, true);
+    
+    ByteString = GET_OBJECT(binary, "ByteString");
+    HANDLE_EXCEPTION(true, true);
 
 }
 END_NARWHAL_MODULE
