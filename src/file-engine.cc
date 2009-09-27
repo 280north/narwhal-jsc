@@ -53,12 +53,11 @@ FUNCTION(F_mtime, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
     
-    THROW("NYI mtime");
-    
 	struct stat stat_info;
     int ret = stat(path, &stat_info);
-    
-    return JS_undefined;
+
+    ARGS_ARRAY(argv, JS_int(stat_info.st_mtime * 1000));
+    return JSObjectMakeDate(_context, 1, argv, _exception);
 }
 END
 
@@ -352,7 +351,7 @@ NARWHAL_MODULE(file_engine)
     
     EXPORTS("cwd", JS_fn(F_cwd));
     EXPORTS("canonical", JS_fn(F_canonical));
-    //EXPORTS("mtime", JS_fn(F_mtime));
+    EXPORTS("mtime", JS_fn(F_mtime));
     EXPORTS("size", JS_fn(F_size));
     EXPORTS("stat", JS_fn(F_stat));
     EXPORTS("exists", JS_fn(F_exists));
