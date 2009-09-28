@@ -204,17 +204,14 @@ int narwhal(int argc, char *argv[], char *envp[])
 {
 #ifdef WEBKIT
     NSAutoreleasePool *pool = [NSAutoreleasePool new];
-
     WebView * webView = [[WebView alloc] init];
-
     JSGlobalContextRef _context = [[webView mainFrame] globalContext];
 #elif defined(JSCOCOA)
     NSAutoreleasePool *pool = [NSAutoreleasePool new];
-    JSCocoaController* jsc = [JSCocoa new];
+    JSCocoaController *jsc = [JSCocoa new];
     JSGlobalContextRef _context = [jsc ctx];
 #else
     JSGlobalContextRef _context = JSGlobalContextCreate(NULL);
-    JSGlobalContextRetain(_context);
 #endif
 
     pthread_mutex_t	_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -249,15 +246,16 @@ int narwhal(int argc, char *argv[], char *envp[])
     }
     
     JSEvaluateScript(_context, bootstrapSource, 0, 0, 0, _exception);
+    JSStringRelease(bootstrapSource);
+    
     if (*_exception) {
         JS_Print(*_exception);
     }
     
-    JSStringRelease(bootstrapSource);
-    
     UNLOCK();
     
-    //RunShell(_context);
+    if (argc <= 1)
+        RunShell(_context);
 
 #ifdef WEBKIT
     [pool drain];

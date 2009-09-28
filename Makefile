@@ -1,5 +1,5 @@
 CPP       =g++
-CPPFLAGS  =-g -O0 -x objective-c #-save-temps
+CPPFLAGS  =-g -O0 #-save-temps
 
 FRAMEWORKS_DIR=frameworks
 
@@ -26,7 +26,7 @@ jscocoa: frameworks jsc-jscocoa modules
 	
 jsc: $(SOURCE)
 	mkdir -p `dirname $(EXECUTABLE)`
-	$(CPP) $(CPPFLAGS) $(INCLUDES) -o $(EXECUTABLE) $(SOURCE) $(LIBS)
+	$(CPP) $(CPPFLAGS) $(INCLUDES) -o $(EXECUTABLE) -x objective-c $(SOURCE) $(LIBS)
 
 jsc-jscocoa: $(SOURCE)
 	mkdir -p `dirname $(EXECUTABLE)`
