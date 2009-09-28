@@ -4,7 +4,7 @@
 
 #include <binary-engine.h>
 
-#include "../mongoose.h"
+#include "../../../mongoose.h"
 
 
 typedef JSValueRef (*NWFunction)(JSContextRef, JSObjectRef, JSObjectRef, size_t, const JSValueRef[], JSValueRef *);
@@ -248,8 +248,20 @@ void handler(struct mg_connection *conn, const struct mg_request_info *info, voi
     UNLOCK();
 }
 
-FUNCTION(Mg_start, ARG_UTF8(port), ARG_FN(app))
+FUNCTION(MG_run, ARG_FN(app))
 {
+    int port = 8080;
+
+    if (ARGC > 1 && IS_OBJECT(ARGV(1))) {
+        JSObjectRef options = JS_obj(ARGV(1));
+        port = GET_INT(options, "port");
+        if (*_exception) {
+            JS_Print(*_exception);
+            *_exception = NULL;
+        }
+    }
+    fprintf(stderr, "Starting Mongoose on port %d...", port);
+    
     MongoosePrivate *data = (MongoosePrivate*)malloc(sizeof(MongoosePrivate));
     printf("%p\n", data);
     
@@ -260,7 +272,9 @@ FUNCTION(Mg_start, ARG_UTF8(port), ARG_FN(app))
     //JSGlobalContextRetain(_context);
     JSValueProtect(_context, app);
 	
-	mg_set_option(data->mongooseContext, "ports", port);
+    char buffer[1024];
+    snprintf(buffer, sizeof(buffer), "%d", port);
+	mg_set_option(data->mongooseContext, "ports", buffer);
 	mg_set_option(data->mongooseContext, "max_threads", "1");
 	
 	mg_set_uri_callback(data->mongooseContext, "/*", &handler, (void*)data);
@@ -275,7 +289,7 @@ FUNCTION(Mg_start, ARG_UTF8(port), ARG_FN(app))
 }
 END
 
-FUNCTION(Mg_stop, ARG_OBJ(mgCtx))
+FUNCTION(MG_stop, ARG_OBJ(mgCtx))
 {
     GET_INTERNAL(MongoosePrivate *, data, mgCtx);
 
@@ -288,7 +302,7 @@ END
 
 NARWHAL_MODULE(os_engine)
 {
-    EXPORTS("mg_start", JS_fn(Mg_start));
-    EXPORTS("mg_stop", JS_fn(Mg_stop));
+    EXPORTS("stop", JS_fn(MG_stop));
+    EXPORTS("run", JS_fn(MG_run));
 }
 END_NARWHAL_MODULE

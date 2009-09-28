@@ -189,10 +189,10 @@ void* RunShell(JSContextRef _context) {
             HANDLE_EXCEPTION(true, false);
         }
         
+        JSStringRelease(source);
+        
         UNLOCK();
         
-        JSStringRelease(source);
-
 #ifdef JSCOCOA
         [pool drain];
 #endif
@@ -200,20 +200,8 @@ void* RunShell(JSContextRef _context) {
     printf("\n");
 }
 
-int narwhal(int argc, char *argv[], char *envp[])
+JSValueRef narwhal(JSGlobalContextRef _context, JSValueRef *_exception, int argc, char *argv[], char *envp[])
 {
-#ifdef WEBKIT
-    NSAutoreleasePool *pool = [NSAutoreleasePool new];
-    WebView * webView = [[WebView alloc] init];
-    JSGlobalContextRef _context = [[webView mainFrame] globalContext];
-#elif defined(JSCOCOA)
-    NSAutoreleasePool *pool = [NSAutoreleasePool new];
-    JSCocoaController *jsc = [JSCocoa new];
-    JSGlobalContextRef _context = [jsc ctx];
-#else
-    JSGlobalContextRef _context = JSGlobalContextCreate(NULL);
-#endif
-
     pthread_mutex_t	_mutex = PTHREAD_MUTEX_INITIALIZER;
 
     narwhal_context.context = _context;
@@ -222,9 +210,6 @@ int narwhal(int argc, char *argv[], char *envp[])
     LOCK();
 
     JSObjectRef global = JS_GLOBAL;
-    
-    JSValueRef exception = NULL;
-    JSValueRef *_exception = &exception;
 
     SET_VALUE(global, "print",          JS_fn(NW_print));
     SET_VALUE(global, "isFile",         JS_fn(NW_isFile));
@@ -241,30 +226,49 @@ int narwhal(int argc, char *argv[], char *envp[])
     
     JSStringRef bootstrapSource = ReadFile(bootstrapPathFull);
     if (!bootstrapSource) {
-        printf("Error reading bootstrap.js\n");
-        return 1;
+        THROW("Error reading bootstrap.js\n");
     }
     
     JSEvaluateScript(_context, bootstrapSource, 0, 0, 0, _exception);
     JSStringRelease(bootstrapSource);
     
-    if (*_exception) {
-        JS_Print(*_exception);
-    }
-    
     UNLOCK();
     
-    if (argc <= 1)
+    if (!*_exception && argc <= 1)
         RunShell(_context);
-
-#ifdef WEBKIT
-    [pool drain];
-#elif defined(JSCOCOA)
-    [pool drain];
-#endif
 }
 
 int main(int argc, char *argv[], char *envp[])
 {
-    return narwhal(argc, argv, envp);
+    #ifdef WEBKIT
+        NSAutoreleasePool *pool = [NSAutoreleasePool new];
+        WebView * webView = [[WebView alloc] init];
+        JSGlobalContextRef _context = [[webView mainFrame] globalContext];
+    #elif defined(JSCOCOA)
+        NSAutoreleasePool *pool = [NSAutoreleasePool new];
+        JSCocoaController *jsc = [JSCocoa new];
+        JSGlobalContextRef _context = [jsc ctx];
+    #else
+        JSGlobalContextRef _context = JSGlobalContextCreate(NULL);
+    #endif
+    
+    JSValueRef exception = NULL;
+    JSValueRef *_exception = &exception;
+        
+    CALL(narwhal, argc, argv, envp);
+    
+    int code = 0;
+    
+    if (*_exception) {
+        code = 1;
+        JS_Print(*_exception);
+    }
+    
+    #ifdef WEBKIT
+        [pool drain];
+    #elif defined(JSCOCOA)
+        [pool drain];
+    #endif
+    
+    return code;
 }

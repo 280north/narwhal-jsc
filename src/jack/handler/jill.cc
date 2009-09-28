@@ -2,9 +2,9 @@
 
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <unistd.h>q
+#include <unistd.h>
 
-#include "../deps/http-parser/http_parser.h"
+#include "../../../deps/http-parser/http_parser.h"
 
 #include <binary-engine.h>
 #include <io-engine.h>
@@ -149,7 +149,7 @@ JSValueRef handlerWrapper(
     HANDLE_EXCEPTION(true, true);
     
     // REQUEST_METHOD
-    char *methodName = NULL;
+    char *methodName = "GET";
     switch (parser->method) {
         case HTTP_COPY      : methodName = "COPY"; break;
         case HTTP_DELETE    : methodName = "DELETE"; break;
@@ -164,20 +164,17 @@ JSValueRef handlerWrapper(
         case HTTP_PUT       : methodName = "PUT"; break;
         case HTTP_TRACE     : methodName = "TRACE"; break;
         case HTTP_UNLOCK    : methodName = "UNLOCK"; break;
-        case HTTP_GET       :
-        default             : methodName = "GET"; break;
+        case HTTP_GET       : methodName = "GET"; break;
     }
     SET_VALUE(env, "REQUEST_METHOD", JS_str_utf8(methodName, strlen(methodName)));
     HANDLE_EXCEPTION(true, true);
     
     // SERVER_PROTOCOL
-    char *versionName = NULL;
+    char *versionName = "HTTP/1.1";
     switch (parser->version) {
         case HTTP_VERSION_09    : versionName = "HTTP/0.9"; break;
         case HTTP_VERSION_10    : versionName = "HTTP/1.0"; break;
-        case HTTP_VERSION_11    : 
-        case HTTP_VERSION_OTHER : 
-        default                 : versionName = "HTTP/1.1"; break;
+        case HTTP_VERSION_11    : versionName = "HTTP/1.1"; break;
     }
     SET_VALUE(env, "SERVER_PROTOCOL", JS_str_utf8(versionName, strlen(versionName)));
     HANDLE_EXCEPTION(true, true);
@@ -213,14 +210,16 @@ JSValueRef handlerWrapper(
     if (!data->body) {
         data->body = "";
         data->bodyLen = 0;
-    } else {
-        data->body[data->bodyLen] = '\0';
     }
-
-    JSObjectRef bytes = CALL(Bytes_new, data->body, data->bodyLen);
+    
+    // TODO: modify parsing to use a separate buffer directly to prevent copying
+    char *bodyBuffer = (char *)malloc(data->bodyLen * sizeof(char));
+    memcpy(bodyBuffer, data->body, data->bodyLen);
+    
+    JSObjectRef bytes = CALL(Bytes_new, bodyBuffer, data->bodyLen);
     HANDLE_EXCEPTION(true, true);
     
-    // new ByeString(bytes, 0, 0)
+    // new ByteString(bytes, 0, 0)
     ARGS_ARRAY(byteStringArgs, bytes, JS_int(0), JS_int(data->bodyLen));
     JSObjectRef byteString = CALL_AS_CONSTRUCTOR(ByteString, 3, byteStringArgs);
     
@@ -286,8 +285,6 @@ JSValueRef handlerWrapper(
     if (send(data->fd, buffer, strlen(buffer), 0) < 0)
         THROW("Client closed connection");
     
-    //fprintf(f, "%s %d\r\n", "HTTP/1.1", status);
-    
     // HEADERS:
     JSObjectRef headers = GET_OBJECT(result, "headers");
     JSPropertyNameArrayRef headerNames = JSObjectCopyPropertyNames(_context, headers);
@@ -330,13 +327,11 @@ JSValueRef handlerWrapper(
     JSObjectRef body = GET_OBJECT(result, "body");
     HANDLE_EXCEPTION(true, true);
     JSObjectRef forEach = GET_OBJECT(body, "forEach");
-    //printf("forEach=%p\n", forEach);
     HANDLE_EXCEPTION(true, true);
     
     JSObjectRef writer = JSObjectMakeFunctionWithCallback(_context, NULL, HS_writer);
 
     JSObjectRef that = JSObjectMake(_context, Custom_class(_context), data);
-    //SET_INTERNAL(that, data);
     
     JSObjectRef binder = GET_OBJECT(writer, "bind");
     HANDLE_EXCEPTION(true, true);
@@ -348,31 +343,33 @@ JSValueRef handlerWrapper(
     HANDLE_EXCEPTION(true, true);
     
     *_exception = NULL;
-    //JSValueRef argv2[1] = { writer };
     JSValueRef argv2[1] = { boundWriter };
-    //printf("%p %p %p %p %p %p\n", _context, forEach, body, argv2, _exception, *_exception);
     JSObjectCallAsFunction(_context, forEach, body, 1, argv2, _exception);
     HANDLE_EXCEPTION(true, true);
     
     return 0;
 }
 
-int dispatch(http_parser *parser) {
+void dispatch(http_parser *parser) {
     client_data *data = (client_data *)parser->data;
     JSContextRef _context = data->_context;
     JSValueRef *_exception = data->_exception;
 
+    if (data->complete)
+        return;
+        
+    data->complete = 1;
+
+    DEBUG("Dispatching...\n");
+
     *_exception = NULL;
     JSValueRef result = handlerWrapper(_context, _exception, parser);
-    
-    data->complete = 1;
     
     if (*_exception) {
         printf("ERROR:");
         JSValueRef exceptionToPrint = *_exception;
         *_exception = NULL;
         JS_Print(exceptionToPrint);
-        //return 1;
     }
 }
 
@@ -460,7 +457,10 @@ int on_headers_complete(http_parser *parser) {
     
     //printf("on_headers_complete\n");
     
-    //dispatch(parser);
+    // headers done but no content-length, assume no body
+    // TODO: is this the desired behavior?
+    if (parser->content_length < 0)
+        dispatch(parser);
     
     return 0;
 }
@@ -489,6 +489,7 @@ int on_message_complete(http_parser *parser) {
     //JSValueRef *_exception = data->_exception;
     
     //printf("on_message_complete\n");
+    
     dispatch(parser);
     
     return 0;

@@ -1,11 +1,15 @@
 CPP       =g++
-CPPFLAGS  =-g -O0 #-save-temps
+CPPFLAGS   =
+#CPPFLAGS  +=-DWEBKIT
+#CPPFLAGS +=-g -O0
+#CPPFLAGS +=-DDEBUG_ON
+#CPPFLAGS +=-save-temps
 
 FRAMEWORKS_DIR=frameworks
 
 INCLUDES  =-Iinclude
 LIBS      =-lreadline -F$(FRAMEWORKS_DIR) -framework JavaScriptCore -framework WebKit -framework Foundation -L/usr/lib -liconv
-MODULES   =$(patsubst %.cc,%.dylib,$(patsubst src/%,lib/%,$(wildcard src/*.cc)))
+MODULES   =$(patsubst %.cc,%.dylib,$(patsubst src/%,lib/%,$(shell find src -name '*.cc')))
 
 SOURCE    =narwhal-jsc.c
 EXECUTABLE=bin/narwhal-jsc
@@ -38,7 +42,7 @@ modules: $(MODULES)
 mongoose.o: mongoose.c
 	gcc $(CPPFLAGS) -W -Wall -std=c99 -pedantic -fomit-frame-pointer -c mongoose.c
 
-lib/mongoose.dylib: src/mongoose.cc mongoose.o
+lib/jack/handler/mongoose.dylib: src/jack/handler/mongoose.cc mongoose.o
 	mkdir -p `dirname $@`
 	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(LIBS) mongoose.o
 	install_name_tool -change "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore" "@executable_path/../frameworks/JavaScriptCore.framework/JavaScriptCore" $@
@@ -49,7 +53,7 @@ deps/http-parser/http_parser.o: deps/http-parser
 deps/http-parser:
 	git clone git://github.com/ry/http-parser.git $@
 
-lib/jill.dylib: src/jill.cc deps/http-parser/http_parser.o lib/io-engine.dylib lib/binary-engine.dylib
+lib/jack/handler/jill.dylib: src/jack/handler/jill.cc deps/http-parser/http_parser.o lib/io-engine.dylib lib/binary-engine.dylib
 	mkdir -p `dirname $@`
 	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(LIBS) deps/http-parser/http_parser.o lib/io-engine.dylib lib/binary-engine.dylib
 	install_name_tool -change "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore" "@executable_path/../frameworks/JavaScriptCore.framework/JavaScriptCore" $@
@@ -84,6 +88,7 @@ $(JSCOCOA_CHECKOUT):
 	git clone git://github.com/parmanoir/jscocoa.git $@
 
 clean:
+	find lib -name "*.dylib" -exec rm -rf {} \;
 	rm -rf bin/narwhal-jsc* bin/*.dylib bin/*.dSYM lib/*.dylib lib/*.dSYM $(EXECUTABLE) *.o *.ii *.s
 
 cleaner: clean

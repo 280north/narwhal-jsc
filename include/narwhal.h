@@ -65,27 +65,24 @@ JSValueRef JSValueMakeStringWithUTF16(JSContextRef _context, JSChar *string, siz
 
 void JSValuePrint(JSContextRef _context, JSValueRef *_exception, JSValueRef value)
 {
+    JSValueRef tmpException = NULL;
+    
     if (!value) return;
 
-    JSStringRef string = JSValueToStringCopy(_context, value, _exception);
-    if (!string || _exception && *_exception)
-        return;
-
-    size_t length = JSStringGetMaximumUTF8CStringSize(string);
-
-    char *buffer = (char*)malloc(length);
-    if (!buffer) {
+    JSStringRef string = JSValueToStringCopy(_context, value, &tmpException);
+    if (!string || tmpException) {
         if (_exception)
-            *_exception = JSValueMakeStringWithUTF8CString(_context, "print error (malloc)");
-        JSStringRelease(string);
+            *_exception = tmpException;
         return;
     }
 
+    size_t length = JSStringGetMaximumUTF8CStringSize(string);
+    char buffer[length];
+    
     JSStringGetUTF8CString(string, buffer, length);
     JSStringRelease(string);
-
+    
     puts(buffer);
-    free(buffer);
 }
 
 #define STRINGIZE2(s) #s
