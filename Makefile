@@ -1,10 +1,10 @@
 CPP       =g++
-CPPFLAGS  =-g -arch i386 -O0 #-save-temps
+CPPFLAGS  =-g -O0 -x objective-c #-save-temps
 
 FRAMEWORKS_DIR=frameworks
 
 INCLUDES  =-Iinclude
-LIBS      =-lreadline -F$(FRAMEWORKS_DIR) -framework JavaScriptCore -L/usr/lib -liconv
+LIBS      =-lreadline -F$(FRAMEWORKS_DIR) -framework JavaScriptCore -framework WebKit -framework Foundation -L/usr/lib -liconv
 MODULES   =$(patsubst %.cc,%.dylib,$(patsubst src/%,lib/%,$(wildcard src/*.cc)))
 
 SOURCE    =narwhal-jsc.c
@@ -19,7 +19,7 @@ JSCOCOA_FRAMEWORK=$(FRAMEWORKS_DIR)/JSCocoa.framework
 JSCOCOA_BUILD=deps/JSCocoa/JSCocoa/build/Release/JSCocoa.framework
 JSCOCOA_CHECKOUT=deps/JSCocoa
 
-FRAMEWORKS=$(JSCOCOA_FRAMEWORK) $(JSCORE_FRAMEWORK)
+FRAMEWORKS=$(JSCORE_FRAMEWORK)
 
 all: frameworks jsc modules
 jscocoa: frameworks jsc-jscocoa modules
