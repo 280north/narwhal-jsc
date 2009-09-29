@@ -73,7 +73,7 @@ JSValueRef processHeader(
     return NULL;
 }
 
-FUNCTION(HS_writer)
+FUNCTION(Jill_writer)
 {
     GET_INTERNAL(client_data*, data, THIS);
     if (!data)
@@ -281,7 +281,7 @@ JSValueRef handlerWrapper(
     int status = GET_INT(result, "status");
     HANDLE_EXCEPTION(true, true);
     
-    char *reason = "OK";
+    char *reason = "OK"; // FIXME
     snprintf(buffer, sizeof(buffer), "%s %d %s\r\n", "HTTP/1.1", status, reason);
     if (send(data->fd, buffer, strlen(buffer), 0) < 0)
         THROW("Client closed connection");
@@ -330,22 +330,19 @@ JSValueRef handlerWrapper(
     JSObjectRef forEach = GET_OBJECT(body, "forEach");
     HANDLE_EXCEPTION(true, true);
     
-    JSObjectRef writer = JSObjectMakeFunctionWithCallback(_context, NULL, HS_writer);
-
-    JSObjectRef that = JSObjectMake(_context, Custom_class(_context), data);
+    JSObjectRef writer = JSObjectMakeFunctionWithCallback(_context, NULL, Jill_writer);
     
     JSObjectRef binder = GET_OBJECT(writer, "bind");
     HANDLE_EXCEPTION(true, true);
+
+    JSObjectRef that = JSObjectMake(_context, Custom_class(_context), data);
     
-    //JSGarbageCollect(_context);
-    *_exception = NULL;
-    JSValueRef argv1[1] = { that };
-    JSValueRef boundWriter = JSObjectCallAsFunction(_context, binder, writer, 1, argv1, _exception);
+    ARGS_ARRAY(bindArgs, that);
+    JSValueRef boundWriter = JSObjectCallAsFunction(_context, binder, writer, 1, bindArgs, _exception);
     HANDLE_EXCEPTION(true, true);
     
-    *_exception = NULL;
-    JSValueRef argv2[1] = { boundWriter };
-    JSObjectCallAsFunction(_context, forEach, body, 1, argv2, _exception);
+    ARGS_ARRAY(forEachArgs, boundWriter);
+    JSObjectCallAsFunction(_context, forEach, body, 1, forEachArgs, _exception);
     HANDLE_EXCEPTION(true, true);
     
     return 0;
@@ -367,10 +364,7 @@ void dispatch(http_parser *parser) {
     JSValueRef result = handlerWrapper(_context, _exception, parser);
     
     if (*_exception) {
-        printf("ERROR:");
-        JSValueRef exceptionToPrint = *_exception;
-        *_exception = NULL;
-        JS_Print(exceptionToPrint);
+        JS_Print(*_exception);
     }
 }
 
@@ -451,21 +445,7 @@ int on_header_value(http_parser *parser, const char *at, size_t length) {
     return 0;
 }
 
-int on_headers_complete(http_parser *parser) {
-    //client_data *data = (client_data *)parser->data;
-    //JSContextRef _context = data->_context;
-    //JSValueRef *_exception = data->_exception;
-    
-    //printf("on_headers_complete\n");
-    
-    // headers done but no content-length, assume no body
-    // TODO: is this the desired behavior?
-    if (parser->content_length < 0)
-        dispatch(parser);
-    
-    return 0;
-}
-
+// FIXME: stream body (buffer first "on_body" chunk, then use raw socket?)
 int on_body(http_parser *parser, const char *at, size_t length) {
     client_data *data = (client_data *)parser->data;
     //JSContextRef _context = data->_context;
@@ -484,6 +464,21 @@ int on_body(http_parser *parser, const char *at, size_t length) {
     return 0;
 }
 
+int on_headers_complete(http_parser *parser) {
+    //client_data *data = (client_data *)parser->data;
+    //JSContextRef _context = data->_context;
+    //JSValueRef *_exception = data->_exception;
+    
+    //printf("on_headers_complete\n");
+    
+    // headers done but no content-length, assume no body
+    // TODO: is this the desired behavior?
+    if (parser->content_length < 0)
+        dispatch(parser);
+    
+    return 0;
+}
+
 int on_message_complete(http_parser *parser) {
     //client_data *data = (client_data *)parser->data;
     //JSContextRef _context = data->_context;
@@ -496,7 +491,7 @@ int on_message_complete(http_parser *parser) {
     return 0;
 }
 
-FUNCTION(HS_run, ARG_FN(app))
+FUNCTION(Jill_run, ARG_FN(app))
 {
     int port = 8080;
     int backlog = 100;
@@ -608,16 +603,15 @@ FUNCTION(HS_run, ARG_FN(app))
                 }
                 break;
             }
-            
-            //printf("data.complete=%d recved=%d\n", data.complete, recved);
-            
+
             if (data.complete) {
                 break;
             }
-            
-            if (recved == 0)
+
+            if (recved == 0) {
                 break;
-                
+            }
+
             bufferPosition += recved;
         }
         
@@ -630,7 +624,7 @@ END
 
 NARWHAL_MODULE(http_server_engine)
 {
-    EXPORTS("run", JS_fn(HS_run));
+    EXPORTS("run", JS_fn(Jill_run));
     
     JSObjectRef io = require("io");
     HANDLE_EXCEPTION(true, true);

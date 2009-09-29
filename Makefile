@@ -14,7 +14,7 @@ LIBS     +=-F$(FRAMEWORKS_DIR)
 SOURCE    =narwhal-jsc.c
 EXECUTABLE=bin/narwhal-jsc
 
-JSCORE_CONFIG=Debug
+JSCORE_CONFIG=Production
 JSCORE_FRAMEWORK=$(FRAMEWORKS_DIR)/JavaScriptCore.framework
 JSCORE_BUILD=deps/JavaScriptCore/build/$(JSCORE_CONFIG)/JavaScriptCore.framework
 JSCORE_CHECKOUT=deps/JavaScriptCore
