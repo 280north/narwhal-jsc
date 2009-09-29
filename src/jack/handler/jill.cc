@@ -281,7 +281,8 @@ JSValueRef handlerWrapper(
     int status = GET_INT(result, "status");
     HANDLE_EXCEPTION(true, true);
     
-    snprintf(buffer, sizeof(buffer), "%s %d\r\n", "HTTP/1.1", status);
+    char *reason = "OK";
+    snprintf(buffer, sizeof(buffer), "%s %d %s\r\n", "HTTP/1.1", status, reason);
     if (send(data->fd, buffer, strlen(buffer), 0) < 0)
         THROW("Client closed connection");
     

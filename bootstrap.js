@@ -12,7 +12,6 @@
         var factories = {};
         
         loader.reload = function(topId, path) {
-            _print("loading native: " + topId + " (" + path + ")");
             factories[topId] = requireNative(topId, path);
         }
         
@@ -45,8 +44,8 @@
         },
         loaders: [[".dylib", NativeLoader()]],
         os : "darwin",
-        debug: true,
-        verbose: true
+        debug: ENV['NARWHAL_DEBUG'],
+        verbose: ENV['NARWHAL_VERBOSE']
     });
 
 })(function () {

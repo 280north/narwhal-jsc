@@ -339,7 +339,6 @@ JSClassRef Custom_class(JSContextRef _context)
     return jsClass;
 }
 
-
 extern JSObjectRef Require;
 extern JSObjectRef Exports;
 extern JSObjectRef Module;
@@ -349,5 +348,10 @@ extern JSContextRef _context;
 extern NarwhalContext narwhal_context;
 extern void print(const char * string);
 extern JSObjectRef require(const char *id);
+
+JSObjectRef JSObjectMakeArray(JSContextRef _context, size_t argc, const JSValueRef argv[],  JSValueRef* _exception);
+JSObjectRef JSObjectMakeDate(JSContextRef _context, size_t argc, const JSValueRef argv[],  JSValueRef* _exception);
+JSObjectRef JSObjectMakeError(JSContextRef _context, size_t argc, const JSValueRef argv[],  JSValueRef* _exception);
+JSObjectRef JSObjectMakeRegExp(JSContextRef _context, size_t argc, const JSValueRef argv[],  JSValueRef* _exception);
 
 #endif

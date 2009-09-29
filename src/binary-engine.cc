@@ -268,7 +268,7 @@ FUNCTION(B_TRANSCODE, ARG_OBJ(srcBytes), ARG_INT(srcOffset), ARG_INT(srcLength),
 }
 END
 
-NARWHAL_MODULE(binary_platform)
+NARWHAL_MODULE(binary_engine)
 {
     EXPORTS("B_LENGTH", JS_fn(B_LENGTH));
     EXPORTS("B_ALLOC", JS_fn(B_ALLOC));
