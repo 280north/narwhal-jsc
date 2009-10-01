@@ -1,3 +1,18 @@
+/*
+ * Jill: Jack's companion. A minimal JSGI compatible webserver.
+ *
+ * Created by Thomas Robinson.
+ * Copyright 2009, 280 North, Inc.
+ *
+ *  Known issues:
+ *
+ *  - Buffers entire request body before dispatching
+ *  - Stalls if Content-Length is greater than bytes sent (needs timeout)
+ *  - "Expect: 100-continue" not handled
+ *  - Keepalive not supported
+ *
+ */
+
 #include <narwhal.h>
 
 #include <sys/socket.h>
@@ -23,19 +38,26 @@ typedef struct _client_data {
     JSObjectRef env;
     JSObjectRef app;
     
-    char    *path;
+    char    *base;
+    
+    // char    *path;
+    ssize_t pathOff;
     ssize_t pathLen;
     
-    char    *query;
+    // char    *query;
+    ssize_t queryOff;
     ssize_t queryLen;
     
-    char    *hName;
+    // char    *hName;
+    ssize_t hNameOff;
     ssize_t hNameLen;
     
-    char    *hValue;
+    // char    *hValue;
+    ssize_t hValueOff;
     ssize_t hValueLen;
     
-    char    *body;
+    //char    *body;
+    ssize_t bodyOff;
     ssize_t bodyLen;
     
     int     complete;
@@ -48,25 +70,28 @@ JSValueRef processHeader(
     if (data->hValueLen > 0) {
         JSObjectRef env = data->env;
         
-        data->hName[data->hNameLen] = '\0';
-        data->hValue[data->hValueLen] = '\0';
+        char *hName = data->base + data->hNameOff;
+        char *hValue = data->base + data->hValueOff;
+        
+        hName[data->hNameLen] = '\0';
+        hValue[data->hValueLen] = '\0';
         
         char buffer[data->hNameLen + 5];
         memcpy(buffer, "HTTP_", 5);
-        char c, *dst = buffer + 5, *src = data->hName;
+        char c, *dst = buffer + 5, *src = hName;
         while (c = *(src++))
             *(dst++) = (c == '-') ? '_' : toupper(c);
         *dst = '\0';
         
         if (!strcmp("HTTP_CONTENT_LENGTH", buffer) || !strcmp("HTTP_CONTENT_TYPE", buffer)) {
-            SET_VALUE(env, buffer + 5, JS_str_utf8(data->hValue, data->hValueLen));
+            SET_VALUE(env, buffer + 5, JS_str_utf8(hValue, data->hValueLen));
         } else {
-            SET_VALUE(env, buffer, JS_str_utf8(data->hValue, data->hValueLen));
+            SET_VALUE(env, buffer, JS_str_utf8(hValue, data->hValueLen));
         }
         
-        data->hName = NULL;
+        data->hNameOff = -1;
         data->hNameLen = 0;
-        data->hValue = NULL;
+        data->hValueOff = -1;
         data->hValueLen = 0;
     }
     
@@ -131,18 +156,20 @@ JSValueRef handlerWrapper(
     HANDLE_EXCEPTION(true, true);
     
     // PATH_INFO
-    if (data->path) {
-        data->path[data->pathLen] = '\0';
-        SET_VALUE(env, "PATH_INFO", JS_str_utf8(data->path, data->pathLen));
+    if (data->pathOff >= 0) {
+        char *path = data->base + data->pathOff;
+        path[data->pathLen] = '\0';
+        SET_VALUE(env, "PATH_INFO", JS_str_utf8(path, data->pathLen));
     } else {
         SET_VALUE(env, "PATH_INFO", JS_str_utf8("", 0));
     }
     HANDLE_EXCEPTION(true, true);
     
     // QUERY_STRING
-    if (data->query) {
-        data->query[data->queryLen] = '\0';
-        SET_VALUE(env, "QUERY_STRING", JS_str_utf8(data->query, data->queryLen));
+    if (data->queryOff >= 0) {
+        char *query = data->base + data->queryOff;
+        query[data->queryLen] = '\0';
+        SET_VALUE(env, "QUERY_STRING", JS_str_utf8(query, data->queryLen));
     } else {
         SET_VALUE(env, "QUERY_STRING", JS_str_utf8("", 0));
     }
@@ -206,21 +233,26 @@ JSValueRef handlerWrapper(
     SET_VALUE(env, "jsgi.errors", GET_OBJECT(System, "stderr"));
     HANDLE_EXCEPTION(true, true);
     
+    char *body;
+    ssize_t bodyLen = 0;
     // jsgi.input
-    if (!data->body) {
-        data->body = "";
-        data->bodyLen = 0;
+    if (data->bodyOff < 0) {
+        body = "";
+        bodyLen = 0;
+    } else {
+        body = data->base + data->bodyOff;
+        bodyLen = data->bodyLen;
     }
     
     // TODO: modify parsing to use a separate buffer directly to prevent copying
-    char *bodyBuffer = (char *)malloc(data->bodyLen * sizeof(char));
-    memcpy(bodyBuffer, data->body, data->bodyLen);
+    char *bodyBuffer = (char *)malloc(bodyLen * sizeof(char));
+    memcpy(bodyBuffer, body, bodyLen);
     
-    JSObjectRef bytes = CALL(Bytes_new, bodyBuffer, data->bodyLen);
+    JSObjectRef bytes = CALL(Bytes_new, bodyBuffer, bodyLen);
     HANDLE_EXCEPTION(true, true);
     
     // new ByteString(bytes, 0, 0)
-    ARGS_ARRAY(byteStringArgs, bytes, JS_int(0), JS_int(data->bodyLen));
+    ARGS_ARRAY(byteStringArgs, bytes, JS_int(0), JS_int(bodyLen));
     JSObjectRef byteString = CALL_AS_CONSTRUCTOR(ByteString, 3, byteStringArgs);
     
     // new ByteIO(byteString)
@@ -325,9 +357,9 @@ JSValueRef handlerWrapper(
         THROW("Client closed connection");
     
     // BODY:
-    JSObjectRef body = GET_OBJECT(result, "body");
+    JSObjectRef bodyObject = GET_OBJECT(result, "body");
     HANDLE_EXCEPTION(true, true);
-    JSObjectRef forEach = GET_OBJECT(body, "forEach");
+    JSObjectRef forEach = GET_OBJECT(bodyObject, "forEach");
     HANDLE_EXCEPTION(true, true);
     
     JSObjectRef writer = JSObjectMakeFunctionWithCallback(_context, NULL, Jill_writer);
@@ -342,7 +374,7 @@ JSValueRef handlerWrapper(
     HANDLE_EXCEPTION(true, true);
     
     ARGS_ARRAY(forEachArgs, boundWriter);
-    JSObjectCallAsFunction(_context, forEach, body, 1, forEachArgs, _exception);
+    JSObjectCallAsFunction(_context, forEach, bodyObject, 1, forEachArgs, _exception);
     HANDLE_EXCEPTION(true, true);
     
     return 0;
@@ -383,8 +415,8 @@ int on_path(http_parser *parser, const char *at, size_t length) {
     // JSContextRef _context = data->_context;
     // JSValueRef *_exception = data->_exception;
     
-    if (!data->path) {
-        data->path = (char *)at;
+    if (data->pathOff < 0) {
+        data->pathOff = at - data->base;
         data->pathLen = length;
     }
     else {
@@ -399,8 +431,8 @@ int on_query_string(http_parser *parser, const char *at, size_t length) {
     // JSContextRef _context = data->_context;
     // JSValueRef *_exception = data->_exception;
     
-    if (!data->query) {
-        data->query = (char *)at;
+    if (data->queryOff < 0) {
+        data->queryOff = at - data->base;
         data->queryLen = length;
     }
     else {
@@ -418,8 +450,8 @@ int on_header_field(http_parser *parser, const char *at, size_t length) {
     // add header, if there's one pending
     CALL(processHeader, data);
     
-    if (!data->hName) {
-        data->hName = (char *)at;
+    if (data->hNameOff < 0) {
+        data->hNameOff = at - data->base;
         data->hNameLen = length;
     }
     else {
@@ -434,8 +466,8 @@ int on_header_value(http_parser *parser, const char *at, size_t length) {
     //JSContextRef _context = data->_context;
     //JSValueRef *_exception = data->_exception;
 
-    if (!data->hValue) {
-        data->hValue = (char *)at;
+    if (data->hValueOff < 0) {
+        data->hValueOff = at - data->base;
         data->hValueLen = length;
     }
     else {
@@ -451,15 +483,16 @@ int on_body(http_parser *parser, const char *at, size_t length) {
     //JSContextRef _context = data->_context;
     //JSValueRef *_exception = data->_exception;
     
-    //printf("on_body: %d\n", length);
     
-    if (!data->body) {
-        data->body = (char *)at;
+    if (data->bodyOff < 0) {
+        data->bodyOff = at - data->base;
         data->bodyLen = length;
     }
     else {
          data->bodyLen += length;
     }
+    
+    // printf("on_body: %d (%d)\n", length, data->bodyLen);
     
     return 0;
 }
@@ -546,6 +579,12 @@ FUNCTION(Jill_run, ARG_FN(app))
         
         client_data data;
         memset(&data, 0, sizeof(data));
+        data.base = buffer;
+        data.pathOff = -1;
+        data.queryOff = -1;
+        data.hNameOff = -1;
+        data.hValueOff = -1;
+        data.bodyOff = -1;
         
         data.fd = client_socket;
         data._context = _context;
@@ -574,27 +613,27 @@ FUNCTION(Jill_run, ARG_FN(app))
             if (bufferPosition >= bufferSize) {
                 if (bufferPosition > bufferSize) {
                     fprintf(stderr, "bufferPosition=%d bufferSize=%d WHAT?!\n", bufferPosition, bufferSize);
-                }
+                } 
                 
                 bufferSize *= 2;
                 
                 fprintf(stderr, "reallocing bufferSize=%d\n", bufferSize);
                 
-                buffer = (char *)realloc(buffer, bufferSize);
-                if (!buffer) {
+                data.base = buffer = (char *)realloc(buffer, bufferSize);
+                if (!data.base) {
                     THROW("OOM!");
                     close(client_socket);
                 }
             }
             
             // FIXME: timeout
-            ssize_t recved = recv(client_socket, buffer + bufferPosition, bufferSize - bufferPosition, 0);
+            ssize_t recved = recv(client_socket, data.base + bufferPosition, bufferSize - bufferPosition, 0);
             if (recved < 0) {
                 printf("recv error: %s\n", strerror(errno));
                 break;
             }
 
-            http_parser_execute(&parser, buffer + bufferPosition, recved);
+            http_parser_execute(&parser, data.base + bufferPosition, recved);
 
             if (http_parser_has_error(&parser)) {
                 printf("parse error\n");

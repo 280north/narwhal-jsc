@@ -9,7 +9,7 @@ FRAMEWORKS_DIR=frameworks
 INCLUDES  =-Iinclude
 MODULES   =$(patsubst %.cc,%.dylib,$(patsubst src/%,lib/%,$(shell find src -name '*.cc')))
 LIBS      =-framework JavaScriptCore -L/usr/lib -lreadline -liconv -Llib -lnarwhal
-LIBS     +=-F$(FRAMEWORKS_DIR)
+#LIBS     +=-F$(FRAMEWORKS_DIR)
 
 SOURCE    =narwhal-jsc.c
 EXECUTABLE=bin/narwhal-jsc
