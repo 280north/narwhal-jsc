@@ -326,11 +326,15 @@ FUNCTION(F_FileIO, ARG_UTF8_CAST(path))
     } else if (writeFlag || appendFlag) {
         int fd = open(path, oflag | O_CREAT, 0777);
         DEBUG("fd=%d\n", fd);
+        if (fd < 0)
+            THROW("No such file or directory.");
         ARGS_ARRAY(argv, JS_int(-1), JS_int(fd));
         return JS_obj(CALL_AS_CONSTRUCTOR(IO, 2, argv));
     } else if (readFlag) {
         int fd = open(path, oflag);
         DEBUG("fd=%d\n", fd);
+        if (fd < 0)
+            THROW("No such file or directory.");
         ARGS_ARRAY(argv, JS_int(fd), JS_int(-1));
         return JS_obj(CALL_AS_CONSTRUCTOR(IO, 2, argv));
     } else {
