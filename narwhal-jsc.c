@@ -154,7 +154,7 @@ JSObjectRef argvToArray(JSGlobalContextRef _context, JSValueRef *_exception, int
 
 // The read-eval-execute loop of the shell.
 void* RunShell(JSContextRef _context) {
-    printf("Narwhal version %s, JavaScriptCore version %s\n", "0.1", "FOO");
+    printf("Narwhal version %s, JavaScriptCore engine\n", NARWHAL_VERSION);
     while (true)
     {
 #ifdef JSCOCOA

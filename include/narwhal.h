@@ -3,6 +3,7 @@
 
 // platform name
 #define NARWHAL_JSC
+#define NARWHAL_VERSION "0.2a"
 
 #include <JavaScriptCore/JavaScriptCore.h>
 #include <pthread.h>
