@@ -108,6 +108,8 @@ typedef JSChar NWChar;
 #define IS_FUNCTION(value)  JSObjectIsFunction(_context, value)
 #define IS_STRING(value)    JSValueIsString(_context, value)
 
+#define TO_OBJECT(value)    JSValueToObject(_context, value, _exception)
+
 #define TO_STRING(value)    _TO_STRING(_context, _exception, value)
 JSValueRef _TO_STRING(JSContextRef _context, JSValueRef *_exception, JSValueRef value) {
     JSValueRef tmpException = NULL;
@@ -188,7 +190,7 @@ JSValueRef _TO_STRING(JSContextRef _context, JSValueRef *_exception, JSValueRef 
 #define JS_str_utf8(str, len) JSValueMakeStringWithUTF8CString(_context, str)    
 #define JS_str_utf16(str, len) JSValueMakeStringWithUTF16(_context, (JSChar*)str, (len)/sizeof(JSChar))
 
-#define JS_obj(value)   JSValueToObject(_context, value, _exception)
+//#define JS_obj(value)   JSValueToObject(_context, value, _exception)
 #define JS_fn(f)        JSObjectMakeFunctionWithCallback(_context, NULL, f)
 #define JS_array(count, array) JSObjectMakeArray(_context, count, array, _exception)
 
@@ -211,6 +213,10 @@ JSValueRef _GET_VALUE(JSContextRef _context, JSValueRef *_exception, JSObjectRef
     JSObjectSetProperty(_context, object, nameStr, value, kJSPropertyAttributeNone, _exception); \
     JSStringRelease(nameStr); \
     if (*_exception) { return NULL; }}
+
+#define SET_VALUE_AT_INDEX(object, index, value) \
+    JSObjectSetPropertyAtIndex(_context, object, index, value, _exception); \
+    if (*_exception) { return NULL; }
 
 #define GET_OBJECT(object, name) \
     JSValueToObject(_context, GET_VALUE(object, name), _exception)
@@ -395,8 +401,5 @@ JSValueRef _PROTECT(JSContextRef _context, JSValueRef value) {
 }
 
 #define PROTECT_OBJECT(value) ((NWObject)PROTECT(value))
-
-#define TO_OBJECT(value) JSValueToObject(_context, value, _exception)
-#define SET_VALUE_AT_INDEX(object, index, value) JSObjectSetPropertyAtIndex(_context, object, index, value, _exception)
 
 #endif

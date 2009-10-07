@@ -24,8 +24,8 @@
 #include <binary-engine.h>
 #include <io-engine.h>
 
-JSObjectRef ByteIO;
-JSObjectRef ByteString;
+NWObject ByteIO;
+NWObject ByteString;
 
 typedef struct _client_data {
     int     fd;
@@ -35,8 +35,8 @@ typedef struct _client_data {
     JSContextRef _context;
     JSValueRef *_exception;
     
-    JSObjectRef env;
-    JSObjectRef app;
+    NWObject env;
+    NWObject app;
     
     char    *base;
     
@@ -63,12 +63,12 @@ typedef struct _client_data {
     int     complete;
 } client_data;
 
-JSValueRef processHeader(
+NWValue processHeader(
     JSContextRef _context, JSValueRef *_exception,
     client_data *data
 ) {
     if (data->hValueLen > 0) {
-        JSObjectRef env = data->env;
+        NWObject env = data->env;
         
         char *hName = data->base + data->hNameOff;
         char *hValue = data->base + data->hValueOff;
@@ -111,25 +111,25 @@ FUNCTION(Jill_writer)
     //CALL(JSValuePrint, ARGV(0));
     //HANDLE_EXCEPTION(true, true);
     
-    JSObjectRef chunk = JSValueToObject(_context, ARGV(0), _exception);
+    NWObject chunk = TO_OBJECT(ARGV(0));
     HANDLE_EXCEPTION(true, true);
     
-    JSObjectRef toByteString = GET_OBJECT(chunk, "toByteString");
+    NWObject toByteString = GET_OBJECT(chunk, "toByteString");
     HANDLE_EXCEPTION(true, true);
     
     if (!IS_FUNCTION(toByteString))
         THROW("First argument to writer must be an object which has a toByteString method");
     
-    JSValueRef byteStringValue = JSObjectCallAsFunction(_context, toByteString, chunk, 0, NULL, _exception);
+    NWValue byteStringValue = CALL_AS_FUNCTION(toByteString, chunk, 0, NULL);
     HANDLE_EXCEPTION(true, true);
     
     if (!IS_OBJECT(byteStringValue))
         THROW("toByteString did not return a ByteString object");
     
-    JSObjectRef byteString = JSValueToObject(_context, byteStringValue, _exception);
+    NWObject byteString = TO_OBJECT(byteStringValue);
     HANDLE_EXCEPTION(true, true);
     
-    JSObjectRef _bytes = GET_OBJECT(byteString, "_bytes");
+    NWObject _bytes = GET_OBJECT(byteString, "_bytes");
     HANDLE_EXCEPTION(true, true);
     
     GET_INTERNAL(BytesPrivate*, bytesData, _bytes);
@@ -141,12 +141,12 @@ FUNCTION(Jill_writer)
 }
 END
 
-JSValueRef handlerWrapper(
+NWValue handlerWrapper(
     JSContextRef _context, JSValueRef *_exception,
     http_parser *parser
 ) {
     client_data *data = (client_data *)parser->data;
-    JSObjectRef env = data->env;
+    NWObject env = data->env;
     
     // add the final header
     CALL(processHeader, data);
@@ -248,16 +248,16 @@ JSValueRef handlerWrapper(
     char *bodyBuffer = (char *)malloc(bodyLen * sizeof(char));
     memcpy(bodyBuffer, body, bodyLen);
     
-    JSObjectRef bytes = CALL(Bytes_new, bodyBuffer, bodyLen);
+    NWObject bytes = CALL(Bytes_new, bodyBuffer, bodyLen);
     HANDLE_EXCEPTION(true, true);
     
     // new ByteString(bytes, 0, 0)
     ARGS_ARRAY(byteStringArgs, bytes, JS_int(0), JS_int(bodyLen));
-    JSObjectRef byteString = CALL_AS_CONSTRUCTOR(ByteString, 3, byteStringArgs);
+    NWObject byteString = CALL_AS_CONSTRUCTOR(ByteString, 3, byteStringArgs);
     
     // new ByteIO(byteString)
     ARGS_ARRAY(byteIoArgs, byteString);
-    JSObjectRef input = CALL_AS_CONSTRUCTOR(ByteIO, 1, byteIoArgs);
+    NWObject input = CALL_AS_CONSTRUCTOR(ByteIO, 1, byteIoArgs);
     HANDLE_EXCEPTION(true, true);
     
     SET_VALUE(env, "jsgi.input", input);
@@ -280,8 +280,8 @@ JSValueRef handlerWrapper(
     HANDLE_EXCEPTION(true, true);
     
     // Invoke the application
-    JSValueRef argv[1] = { env };
-    JSValueRef res = JSObjectCallAsFunction(_context, data->app, NULL, 1, argv, _exception);
+    ARGS_ARRAY(appArgs, env);
+    NWValue res = CALL_AS_FUNCTION(data->app, NULL, 1, appArgs);
     //HANDLE_EXCEPTION(true, true);
 
     char buffer[1024];
@@ -306,7 +306,7 @@ JSValueRef handlerWrapper(
         return NULL;
     }
     
-    JSObjectRef result = JSValueToObject(_context, res, _exception);
+    NWObject result = TO_OBJECT(res);
     HANDLE_EXCEPTION(true, true);
     
     // STATUS:
@@ -319,7 +319,7 @@ JSValueRef handlerWrapper(
         THROW("Client closed connection");
     
     // HEADERS:
-    JSObjectRef headers = GET_OBJECT(result, "headers");
+    NWObject headers = GET_OBJECT(result, "headers");
     JSPropertyNameArrayRef headerNames = JSObjectCopyPropertyNames(_context, headers);
     size_t headerCount = JSPropertyNameArrayGetCount(headerNames);
     
@@ -357,24 +357,24 @@ JSValueRef handlerWrapper(
         THROW("Client closed connection");
     
     // BODY:
-    JSObjectRef bodyObject = GET_OBJECT(result, "body");
+    NWObject bodyObject = GET_OBJECT(result, "body");
     HANDLE_EXCEPTION(true, true);
-    JSObjectRef forEach = GET_OBJECT(bodyObject, "forEach");
+    NWObject forEach = GET_OBJECT(bodyObject, "forEach");
     HANDLE_EXCEPTION(true, true);
     
-    JSObjectRef writer = JSObjectMakeFunctionWithCallback(_context, NULL, Jill_writer);
+    NWObject writer = JS_fn(Jill_writer);
     
-    JSObjectRef binder = GET_OBJECT(writer, "bind");
+    NWObject binder = GET_OBJECT(writer, "bind");
     HANDLE_EXCEPTION(true, true);
 
-    JSObjectRef that = JSObjectMake(_context, Custom_class(_context), data);
+    NWObject that = JSObjectMake(_context, Custom_class(_context), data);
     
     ARGS_ARRAY(bindArgs, that);
-    JSValueRef boundWriter = JSObjectCallAsFunction(_context, binder, writer, 1, bindArgs, _exception);
+    NWValue boundWriter = CALL_AS_FUNCTION(binder, writer, 1, bindArgs);
     HANDLE_EXCEPTION(true, true);
     
     ARGS_ARRAY(forEachArgs, boundWriter);
-    JSObjectCallAsFunction(_context, forEach, bodyObject, 1, forEachArgs, _exception);
+    CALL_AS_FUNCTION(forEach, bodyObject, 1, forEachArgs);
     HANDLE_EXCEPTION(true, true);
     
     return 0;
@@ -393,7 +393,7 @@ void dispatch(http_parser *parser) {
     DEBUG("Dispatching...\n");
 
     *_exception = NULL;
-    JSValueRef result = handlerWrapper(_context, _exception, parser);
+    NWValue result = CALL(handlerWrapper, parser);
     
     if (*_exception) {
         JS_Print(*_exception);
@@ -403,7 +403,7 @@ void dispatch(http_parser *parser) {
 int on_message_begin(http_parser *parser) {
     client_data *data = (client_data *)parser->data;
     JSContextRef _context = data->_context;
-    JSValueRef *_exception = data->_exception;
+    //JSValueRef *_exception = data->_exception;
     
     data->env = JSObjectMake(_context, NULL, NULL);
     
@@ -530,7 +530,7 @@ FUNCTION(Jill_run, ARG_FN(app))
     int backlog = 100;
     
     if (ARGC > 1 && IS_OBJECT(ARGV(1))) {
-        JSObjectRef options = JS_obj(ARGV(1));
+        NWObject options = TO_OBJECT(ARGV(1));
         port = GET_INT(options, "port");
         if (*_exception) {
             JS_Print(*_exception);
@@ -665,13 +665,13 @@ NARWHAL_MODULE(http_server_engine)
 {
     EXPORTS("run", JS_fn(Jill_run));
     
-    JSObjectRef io = require("io");
+    NWObject io = require("io");
     HANDLE_EXCEPTION(true, true);
     
     ByteIO = GET_OBJECT(io, "ByteIO");
     HANDLE_EXCEPTION(true, true);
     
-    JSObjectRef binary = require("binary");
+    NWObject binary = require("binary");
     HANDLE_EXCEPTION(true, true);
     
     ByteString = GET_OBJECT(binary, "ByteString");

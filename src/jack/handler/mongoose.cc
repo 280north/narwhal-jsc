@@ -253,7 +253,7 @@ FUNCTION(MG_run, ARG_FN(app))
     int port = 8080;
 
     if (ARGC > 1 && IS_OBJECT(ARGV(1))) {
-        JSObjectRef options = JS_obj(ARGV(1));
+        JSObjectRef options = TO_OBJECT(ARGV(1));
         port = GET_INT(options, "port");
         if (*_exception) {
             JS_Print(*_exception);
