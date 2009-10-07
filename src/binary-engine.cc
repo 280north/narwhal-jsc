@@ -229,7 +229,7 @@ FUNCTION(B_DECODE, ARG_OBJ(bytes), ARG_INT(offset), ARG_INT(srcLength), ARG_UTF8
     if (!transcode((char *)(src_data->buffer + offset), srcLength, &dst, &dstLength, codec, "UTF-16LE"))
         THROW("B_DECODE: iconv error");
 
-    JSString string = JS_str_utf16(dst, dstLength);
+    NWString string = JS_str_utf16(dst, dstLength);
     free(dst);
 
     return string;

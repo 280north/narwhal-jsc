@@ -89,11 +89,15 @@ void JSValuePrint(JSContextRef _context, JSValueRef *_exception, JSValueRef valu
 #define STRINGIZE2(s) #s
 #define STRINGIZE(s) STRINGIZE2(s)
 
+#define NWObject    JSObjectRef
+#define NWValue     JSValueRef
+#define NWString    JSValueRef
+#define NWDate      JSObjectRef
+#define NWArray     JSObjectRef
+typedef JSChar NWChar;
+
 #define THIS _this
 #define JS_GLOBAL JSContextGetGlobalObject(_context)
-
-#define JSString JSValueRef
-#define JSObject JSObjectRef
 
 #define ARGC _argc
 #define ARGV(index) _argv[index]
@@ -103,6 +107,28 @@ void JSValuePrint(JSContextRef _context, JSValueRef *_exception, JSValueRef valu
 #define IS_OBJECT(value)    JSValueIsObject(_context, value)
 #define IS_FUNCTION(value)  JSObjectIsFunction(_context, value)
 #define IS_STRING(value)    JSValueIsString(_context, value)
+
+#define TO_STRING(value)    _TO_STRING(_context, _exception, value)
+JSValueRef _TO_STRING(JSContextRef _context, JSValueRef *_exception, JSValueRef value) {
+    JSValueRef tmpException = NULL;
+
+    if (!value) {
+        THROW("NULL toString!");
+    }
+    
+    JSStringRef string = JSValueToStringCopy(_context, value, &tmpException);
+    if (tmpException) {
+        if (_exception)
+            *_exception = tmpException;
+        return NULL;
+    }
+    
+    JSValueRef stringValue = JSValueMakeString(_context, string);
+    
+    JSStringRelease(string);
+    
+    return stringValue;
+}
 
 #define ARGN_INT(variable, index) \
     if (index >= ARGC || !IS_NUMBER(ARGV(index))) THROW("Argument %d must be a number.", index) \
@@ -162,10 +188,15 @@ void JSValuePrint(JSContextRef _context, JSValueRef *_exception, JSValueRef valu
 #define JS_str_utf8(str, len) JSValueMakeStringWithUTF8CString(_context, str)    
 #define JS_str_utf16(str, len) JSValueMakeStringWithUTF16(_context, (JSChar*)str, (len)/sizeof(JSChar))
 
-
 #define JS_obj(value)   JSValueToObject(_context, value, _exception)
 #define JS_fn(f)        JSObjectMakeFunctionWithCallback(_context, NULL, f)
 #define JS_array(count, array) JSObjectMakeArray(_context, count, array, _exception)
+
+#define JS_date(ms) _JS_date(_context, _exception, ms)
+NWValue _JS_date(JSContextRef _context, JSValueRef* _exception, int ms) {
+    JSValueRef argv[] = { JS_int(ms) };
+    return JSObjectMakeDate(_context, 1, argv, _exception);
+}
 
 #define GET_VALUE(object, name) _GET_VALUE(_context, _exception, object, name)
 JSValueRef _GET_VALUE(JSContextRef _context, JSValueRef *_exception, JSObjectRef object, const char *name) {
@@ -354,5 +385,18 @@ JSObjectRef JSObjectMakeArray(JSContextRef _context, size_t argc, const JSValueR
 JSObjectRef JSObjectMakeDate(JSContextRef _context, size_t argc, const JSValueRef argv[],  JSValueRef* _exception);
 JSObjectRef JSObjectMakeError(JSContextRef _context, size_t argc, const JSValueRef argv[],  JSValueRef* _exception);
 JSObjectRef JSObjectMakeRegExp(JSContextRef _context, size_t argc, const JSValueRef argv[],  JSValueRef* _exception);
+
+#define CLASS(NAME) JSObjectMakeConstructor(_context, NAME ## _class(_context), NAME ## _constructor)
+
+#define PROTECT(value) _PROTECT(_context, value)
+JSValueRef _PROTECT(JSContextRef _context, JSValueRef value) {
+    JSValueProtect(_context, value);
+    return value;
+}
+
+#define PROTECT_OBJECT(value) ((NWObject)PROTECT(value))
+
+#define TO_OBJECT(value) JSValueToObject(_context, value, _exception)
+#define SET_VALUE_AT_INDEX(object, index, value) JSObjectSetPropertyAtIndex(_context, object, index, value, _exception)
 
 #endif

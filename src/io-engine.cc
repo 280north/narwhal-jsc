@@ -1,9 +1,12 @@
 #include <narwhal.h>
+
+#include <iconv.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
-
-#include <iconv.h>
+#include <string.h>
+#include <errno.h>
 
 #include <io-engine.h>
 #include <binary-engine.h>
@@ -24,8 +27,14 @@ CONSTRUCTOR(IO_constructor)
     }
     
     DEBUG("io=[%d,%d]\n", data->input, data->output);
-    
+
+#ifdef NARWHAL_JSC
     JSObjectRef object = JSObjectMake(_context, IO_class(_context), (void*)data);
+#elif NARWHAL_V8
+    NWObject object = THIS;
+    SET_INTERNAL(object, data);
+#endif
+
     return object;
 }
 END
@@ -39,7 +48,7 @@ FUNCTION(IO_readInto, ARG_OBJ(buffer), ARG_INT(length))
         THROW("Stream not open for reading.");
     
     // get the _bytes property of the ByteString/Array, and the private data of that
-    JSObjectRef _bytes = GET_OBJECT(buffer, "_bytes");
+    NWObject _bytes = GET_OBJECT(buffer, "_bytes");
     GET_INTERNAL(BytesPrivate*, bytes, _bytes);
     
     int offset = GET_INT(buffer, "_offset");
@@ -78,7 +87,7 @@ FUNCTION(IO_writeInto, ARG_OBJ(buffer), ARG_INT(from), ARG_INT(to))
         THROW("Stream not open for writing.");
     
     // get the _bytes property of the ByteString/Array, and the private data of that
-    JSObjectRef _bytes = GET_OBJECT(buffer, "_bytes");
+    NWObject _bytes = GET_OBJECT(buffer, "_bytes");
     GET_INTERNAL(BytesPrivate*, bytes, _bytes);
     
     int offset = GET_INT(buffer, "_offset");
@@ -96,7 +105,7 @@ END
 
 FUNCTION(IO_flush)
 {
-    GET_INTERNAL(IOPrivate*, data, THIS);
+    // FIXME
     return THIS;
 }
 END
@@ -117,7 +126,7 @@ FUNCTION(IO_close)
 }
 END
 
-void IO_finalize(JSObjectRef object)
+DESTRUCTOR(IO_finalize)
 {
     GET_INTERNAL(IOPrivate*, data, object);
     
@@ -130,16 +139,21 @@ void IO_finalize(JSObjectRef object)
         
     free(data);
 }
+END
 
 CONSTRUCTOR(TextInputStream_constructor)
 {
     TextInputStreamPrivate *data = (TextInputStreamPrivate*)malloc(sizeof(TextInputStreamPrivate));
-
+    
     //raw, lineBuffering, buffering, charset, options
     ARGN_OBJ(raw, 0);
     //ARGN_OBJ(lineBuffering, 1);
     //ARGN_OBJ(buffering, 2);
-    ARGN_STR_OR_NULL(charsetStr, 3);
+    
+    NWString charsetStr = (ARGC > 3 && IS_STRING(ARGV(3))) ?
+        TO_STRING(ARGV(3)) :
+        JS_str_utf8("UTF-8", strlen("UTF-8"));
+
     //ARGN_OBJ(options, 4);
     
     data->inBuffer = (char*)malloc(1024);
@@ -149,10 +163,12 @@ CONSTRUCTOR(TextInputStream_constructor)
     GET_INTERNAL(IOPrivate*, raw_data, raw);
     data->input = raw_data->input;
     
+#ifdef NARWHAL_JSC
     JSObjectRef object = JSObjectMake(_context, TextInputStream_class(_context), (void*)data);
-    
-    if (!charsetStr)
-        charsetStr = JS_str_utf8("UTF-8", strlen("UTF-8"));
+#elif NARWHAL_V8
+    NWObject object = THIS;
+    SET_INTERNAL(object, data);
+#endif
     
     SET_VALUE(object, "raw", raw);
     SET_VALUE(object, "charset", charsetStr);
@@ -191,7 +207,7 @@ FUNCTION(TextInputStream_read)
     int fd = d->input;
     iconv_t cd = d->cd;
     
-    size_t outBufferSize = numChars ? numChars * sizeof(JSChar) : 1024;
+    size_t outBufferSize = numChars ? numChars * sizeof(NWChar) : 1024;
     size_t outBufferUsed = 0;
     char *outBuffer = (char*)malloc(outBufferSize);
     
@@ -259,7 +275,7 @@ FUNCTION(TextInputStream_read)
     fclose(tmp);
     //*/
     
-    JSValueRef result = JS_str_utf16(outBuffer, outBufferUsed);
+    NWValue result = JS_str_utf16(outBuffer, outBufferUsed);
     free(outBuffer);
     
     return result;
@@ -313,22 +329,7 @@ FUNCTION(TextInputStream_close)
 END
 */
 
-NARWHAL_MODULE(io_engine)
-{
-    JSObjectRef IO = JSObjectMakeConstructor(_context, IO_class(_context), IO_constructor);
-    EXPORTS("IO", IO);
-    
-    JSObjectRef TextInputStream = JSObjectMakeConstructor(_context, TextInputStream_class(_context), TextInputStream_constructor);
-    EXPORTS("TextInputStream", TextInputStream);
-    
-    EXPORTS("STDIN_FILENO", JS_int(STDIN_FILENO));
-    EXPORTS("STDOUT_FILENO", JS_int(STDOUT_FILENO));
-    EXPORTS("STDERR_FILENO", JS_int(STDERR_FILENO));
-    
-    require("io-engine.js");
-}
-END_NARWHAL_MODULE
-
+#ifdef NARWHAL_JSC
 
 extern "C" JSClassRef IO_class(JSContextRef _context)
 {
@@ -385,3 +386,38 @@ extern "C" JSClassRef TextInputStream_class(JSContextRef _context)
     
     return jsClass;
 }
+
+#elif NARWHAL_V8
+
+NWObject TextInputStream_class() {
+    v8::Handle<v8::FunctionTemplate> ft = v8::FunctionTemplate::New(TextInputStream_constructor);
+    v8::Handle<v8::ObjectTemplate>   ot = ft->InstanceTemplate();
+    ot->Set("read", v8::FunctionTemplate::New(TextInputStream_read));
+    ot->SetInternalFieldCount(1);
+    return ft->GetFunction();
+}
+
+NWObject IO_class() {
+    v8::Handle<v8::FunctionTemplate> ft = v8::FunctionTemplate::New(IO_constructor);
+    v8::Handle<v8::ObjectTemplate>   ot = ft->InstanceTemplate();
+    ot->Set("readInto",       v8::FunctionTemplate::New(IO_readInto));
+    ot->Set("writeInto",      v8::FunctionTemplate::New(IO_writeInto));
+    ot->Set("flush",          v8::FunctionTemplate::New(IO_flush));
+    ot->Set("close",          v8::FunctionTemplate::New(IO_close));
+    ot->SetInternalFieldCount(1);
+    return ft->GetFunction();
+}
+#endif
+
+NARWHAL_MODULE(io_engine)
+{
+    EXPORTS("IO", CLASS(IO));
+    EXPORTS("TextInputStream", CLASS(TextInputStream));
+    
+    EXPORTS("STDIN_FILENO", JS_int(STDIN_FILENO));
+    EXPORTS("STDOUT_FILENO", JS_int(STDOUT_FILENO));
+    EXPORTS("STDERR_FILENO", JS_int(STDERR_FILENO));
+    
+    require("io-engine.js");
+}
+END_NARWHAL_MODULE

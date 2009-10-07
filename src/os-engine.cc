@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-JSObjectRef IO;
+NWObject IO;
 
 FUNCTION(OS_exit)
 {
@@ -123,22 +123,28 @@ FUNCTION(OS_popenImpl, ARG_UTF8(command))
         close(infd[1]);
         close(errfd[1]);
 
-        JSObjectRef obj = JSObjectMake(_context, Custom_class(_context), data);
+        // FIXME!
+#ifdef NARWHAL_JSC
+        NWObject obj = JSObjectMake(_context, Custom_class(_context), data);
+#elif NARWHAL_V8
+        THROW("popen not yet implemented for V8");
+        NWObject obj = v8::Object::New();
+#endif
         
         ARGS_ARRAY(stdinArgs, JS_int(-1), JS_int(outfd[0]));
-        JSObjectRef stdinObj = CALL_AS_CONSTRUCTOR(IO, 2, stdinArgs);
+        NWObject stdinObj = CALL_AS_CONSTRUCTOR(IO, 2, stdinArgs);
         HANDLE_EXCEPTION(true, true);
         SET_VALUE(obj, "stdin", stdinObj);
         HANDLE_EXCEPTION(true, true);
         
         ARGS_ARRAY(stdoutArgs, JS_int(infd[0]), JS_int(-1));
-        JSObjectRef stdoutObj = CALL_AS_CONSTRUCTOR(IO, 2, stdoutArgs);
+        NWObject stdoutObj = CALL_AS_CONSTRUCTOR(IO, 2, stdoutArgs);
         HANDLE_EXCEPTION(true, true);
         SET_VALUE(obj, "stdout", stdoutObj);
         HANDLE_EXCEPTION(true, true);
         
         ARGS_ARRAY(stderrArgs, JS_int(errfd[0]), JS_int(-1));
-        JSObjectRef stderrObj = CALL_AS_CONSTRUCTOR(IO, 2, stderrArgs);
+        NWObject stderrObj = CALL_AS_CONSTRUCTOR(IO, 2, stderrArgs);
         HANDLE_EXCEPTION(true, true);
         SET_VALUE(obj, "stderr", stderrObj);
         HANDLE_EXCEPTION(true, true);
@@ -150,7 +156,7 @@ FUNCTION(OS_popenImpl, ARG_UTF8(command))
     }
 }
 END
-    
+
 NARWHAL_MODULE(os_engine)
 {
     EXPORTS("exit", JS_fn(OS_exit));
@@ -160,10 +166,10 @@ NARWHAL_MODULE(os_engine)
     
     require("os-engine.js");
     
-    JSObjectRef io = require("io");
+    NWObject io = require("io");
     HANDLE_EXCEPTION(true, true);
     
-    IO = GET_OBJECT(io, "IO");
+    IO = PROTECT_OBJECT(GET_OBJECT(io, "IO"));
     HANDLE_EXCEPTION(true, true);
 }
 END_NARWHAL_MODULE

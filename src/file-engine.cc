@@ -1,23 +1,16 @@
 #include <narwhal.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <fcntl.h>
+
 #include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <utime.h>
 
-extern JSObjectRef Exports;
-extern JSObjectRef Require;
-extern JSObjectRef Require;
-extern JSObjectRef Exports;
-extern JSObjectRef Module;
-extern JSObjectRef System;
-extern JSObjectRef Print;
-extern JSContextRef _context;
-extern void print(const char * string);
-extern JSObjectRef require(const char *id);
-
-JSObjectRef io = NULL;
+NWObject io;
 
 FUNCTION(F_cwd)
 {
@@ -27,7 +20,7 @@ FUNCTION(F_cwd)
     if (!cwd)
         THROW("Couldn't get cwd.");
         
-    JSValueRef cwdValue = JS_str_utf8(cwd, strlen(cwd));
+    NWValue cwdValue = JS_str_utf8(cwd, strlen(cwd));
     free(cwd);
     
     return cwdValue;
@@ -45,7 +38,7 @@ FUNCTION(F_canonical, ARG_UTF8_CAST(path))
     if (!canon)
         THROW("Canonical failed!");
 
-    return JS_str_utf8(canon, strnlen(canon, PATH_MAX));
+    return JS_str_utf8(canon, strlen(canon));
 }
 END
 
@@ -56,8 +49,7 @@ FUNCTION(F_mtime, ARG_UTF8_CAST(path))
 	struct stat stat_info;
     int ret = stat(path, &stat_info);
 
-    ARGS_ARRAY(argv, JS_int(stat_info.st_mtime * 1000));
-    return JSObjectMakeDate(_context, 1, argv, _exception);
+    return JS_date(stat_info.st_mtime * 1000);
 }
 END
 
@@ -271,12 +263,12 @@ FUNCTION(F_list, ARG_UTF8_CAST(path))
         THROW("No such directory");
     }
 
-    JSObjectRef array = JSObjectMakeArray(_context, 0, NULL, _exception);
+    NWObject array = JS_array(0, NULL);
 
     int index = 0;
     while ((dirp = readdir(dp)) != NULL) {
         if (strcmp(".", dirp->d_name) && strcmp("..", dirp->d_name))
-            JSObjectSetPropertyAtIndex(_context, array, index++, JS_str_utf8(dirp->d_name, dirp->d_namlenq), _exception);
+            SET_VALUE_AT_INDEX(array, index++, JS_str_utf8(dirp->d_name, dirp->d_namlen));
     }
     closedir(dp);
 
@@ -301,11 +293,11 @@ END
 
 FUNCTION(F_FileIO, ARG_UTF8_CAST(path))
 {
-    JSObjectRef IO = GET_OBJECT(io, "IO");
-    JSObjectRef mode_fn = GET_OBJECT(Exports, "mode");
+    NWObject IO = GET_OBJECT(io, "IO");
+    NWObject mode_fn = GET_OBJECT(Exports, "mode");
     
     ARGS_ARRAY(argv, ARGV(1));
-    JSObjectRef modeObject = JS_obj(CALL_AS_FUNCTION(mode_fn, NULL, 1, argv));
+    NWObject modeObject = TO_OBJECT(CALL_AS_FUNCTION(mode_fn, JS_GLOBAL, 1, argv));
     
     int readFlag = GET_BOOL(modeObject, "read");
     int writeFlag = GET_BOOL(modeObject, "write");
@@ -329,18 +321,18 @@ FUNCTION(F_FileIO, ARG_UTF8_CAST(path))
         if (fd < 0)
             THROW("No such file or directory.");
         ARGS_ARRAY(argv, JS_int(-1), JS_int(fd));
-        return JS_obj(CALL_AS_CONSTRUCTOR(IO, 2, argv));
+        return TO_OBJECT(CALL_AS_CONSTRUCTOR(IO, 2, argv));
     } else if (readFlag) {
         int fd = open(path, oflag);
         DEBUG("fd=%d\n", fd);
         if (fd < 0)
             THROW("No such file or directory.");
         ARGS_ARRAY(argv, JS_int(fd), JS_int(-1));
-        return JS_obj(CALL_AS_CONSTRUCTOR(IO, 2, argv));
+        return CALL_AS_CONSTRUCTOR(IO, 2, argv);
     } else {
         THROW("Files must be opened either for read, write, or update mode.");
     }
-    
+    printf("done");
     return JS_undefined;
 }
 END
@@ -348,8 +340,8 @@ END
 
 NARWHAL_MODULE(file_engine)
 {
-    Exports = require("./file");
-    io = require("io");
+    Exports = PROTECT_OBJECT(require("./file"));
+    io = PROTECT_OBJECT(require("io"));
     
     EXPORTS("FileIO", JS_fn(F_FileIO));
     
@@ -381,7 +373,7 @@ NARWHAL_MODULE(file_engine)
     EXPORTS("touchImpl", JS_fn(F_touch));
     //EXPORTS("touch", JS_fn(F_touch));
     
-    JSObjectRef file_engine_js = require("file-engine.js");
+    NWObject file_engine_js = require("file-engine.js");
     EXPORTS("mkdirs", GET_VALUE(file_engine_js, "mkdirs"));
     EXPORTS("touch", GET_VALUE(file_engine_js, "touch"));
 }
