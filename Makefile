@@ -5,11 +5,14 @@ CPPFLAGS   = -0s
 #CPPFLAGS += -save-temps
 
 FRAMEWORKS_DIR=frameworks
+#FRAMEWORKS=-Fframeworks
+#FRAMEWORKS=-F/Users/tlrobinson/code/WebKit/WebKitBuild/Release/
+
+LIB_DIR   =lib
 
 INCLUDES  =-Iinclude
 MODULES   =$(patsubst %.cc,%.dylib,$(patsubst src/%,lib/%,$(shell find src -name '*.cc')))
-LIBS      =-framework JavaScriptCore -L/usr/lib -lreadline -liconv -Llib -lnarwhal
-#LIBS     +=-F$(FRAMEWORKS_DIR)
+LIBS      =-framework JavaScriptCore -L/usr/lib -lreadline -liconv -L$(LIB_DIR) -lnarwhal $(FRAMEWORKS)
 
 SOURCE    =narwhal-jsc.c
 EXECUTABLE=bin/narwhal-jsc
@@ -22,39 +25,46 @@ JSCORE_CHECKOUT=deps/JavaScriptCore
 SYSTEM_JSC=/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore
 RELATIVE_JSC=@executable_path/../frameworks/JavaScriptCore.framework/JavaScriptCore
 
+ABSOLUTE_LIBNARWHAL=$(LIB_DIR)/libnarwhal.dylib
+RELATIVE_LIBNARWHAL=@executable_path/../lib/libnarwhal.dylib
+
 JSCOCOA_FRAMEWORK=$(FRAMEWORKS_DIR)/JSCocoa.framework
 JSCOCOA_BUILD=deps/JSCocoa/JSCocoa/build/Release/JSCocoa.framework
 JSCOCOA_CHECKOUT=deps/JSCocoa
 
 all: frameworks jsc modules rewrite-lib-paths
 jscocoa: frameworks-jscocoa jsc-jscocoa modules rewrite-lib-paths
-webkit: jsc-webkit modules
+webkit: jsc-webkit modules rewrite-lib-paths
 
 lib/libnarwhal.dylib: narwhal.c
-	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< -framework JavaScriptCore
+	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(FRAMEWORKS) -framework JavaScriptCore 
 
 jsc: $(SOURCE) lib/libnarwhal.dylib
 	mkdir -p `dirname $(EXECUTABLE)`
-	$(CPP) $(CPPFLAGS) $(INCLUDES) -o $(EXECUTABLE) $(SOURCE) $(LIBS) 
+	$(CPP) $(CPPFLAGS) $(INCLUDES) -o $(EXECUTABLE) $(SOURCE) $(LIBS)
+	install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$(EXECUTABLE)"
 
 jsc-webkit: $(SOURCE) lib/libnarwhal.dylib
 	mkdir -p `dirname $(EXECUTABLE)`
 	$(CPP) $(CPPFLAGS) $(INCLUDES) -DWEBKIT -o $(EXECUTABLE) -x objective-c $(SOURCE) $(LIBS) \
 		-framework WebKit -framework Foundation -ObjC
+	install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$(EXECUTABLE)"
 
 jsc-jscocoa: $(SOURCE) lib/libnarwhal.dylib
 	mkdir -p `dirname $(EXECUTABLE)`
 	$(CPP) $(CPPFLAGS) $(INCLUDES) -DJSCOCOA -o $(EXECUTABLE) -x objective-c $(SOURCE) $(LIBS) \
-		-framework JSCocoa -framework Foundation -ObjC -F$(FRAMEWORKS_DIR)
+		-framework JSCocoa -framework Foundation -ObjC
+	install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$(EXECUTABLE)"
 
 frameworks: $(JSCORE_FRAMEWORK)
 
-franmeworks-jscocoa: $(JSCORE_FRAMEWORK) $(JSCOCOA_FRAMEWORK)
+frameworks-jscocoa: $(JSCORE_FRAMEWORK) $(JSCOCOA_FRAMEWORK)
 
 modules: $(MODULES)
 
 rewrite-lib-paths:
-	find lib -name "*.dylib" \! -path "*.dSYM*" -exec install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" {} \;
+	#find lib -name "*.dylib" \! -path "*.dSYM*" -exec install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" {} \;
+	find lib -name "*.dylib" \! -path "*.dSYM*" -exec install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" {} \;
 
 mongoose.o: mongoose.c
 	gcc $(CPPFLAGS) -W -Wall -std=c99 -pedantic -fomit-frame-pointer -c mongoose.c

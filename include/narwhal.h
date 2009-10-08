@@ -8,6 +8,9 @@
 #include <JavaScriptCore/JavaScriptCore.h>
 #include <pthread.h>
 
+JSObjectRef JSObjectMakeDate(JSContextRef, size_t, const JSValueRef[], JSValueRef*);
+JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef, const char *);
+
 //#define DEBUG_ON
 #ifdef DEBUG_ON
 #define DEBUG(...) LOG(__VA_ARGS__)
