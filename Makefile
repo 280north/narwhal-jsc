@@ -84,6 +84,8 @@ lib/jack/handler/jill.dylib: src/jack/handler/jill.cc deps/http-parser/http_pars
 	mkdir -p `dirname $@`
 	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(LIBS) deps/http-parser/http_parser.o lib/io-engine.dylib lib/binary-engine.dylib
 	#install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" "$@"
+	install_name_tool -change "lib/io-engine.dylib" "@executable_path/../lib/io-engine.dylib" "$@"
+	install_name_tool -change "lib/binary-engine.dylib" "@executable_path/../lib/io-engine.dylib" "$@"
 	
 lib/%.dylib: src/%.cc
 	mkdir -p `dirname $@`
