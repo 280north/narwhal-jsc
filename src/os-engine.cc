@@ -49,9 +49,11 @@ DESTRUCTOR(Popen_finalize)
     GET_INTERNAL(PopenPrivate *, data, object);
     DEBUG("Popen_finalize=[%p]\n", data);
     if (data) {
-        if (data->infd >= 0) close(data->infd);
-        if (data->outfd >= 0) close(data->outfd);
-        if (data->errfd >= 0) close(data->errfd);
+        // these will be closed by the IO object's finalize method:
+        // if (data->infd >= 0) close(data->infd);
+        // if (data->outfd >= 0) close(data->outfd);
+        // if (data->errfd >= 0) close(data->errfd);
+        
         free(data);
     }
 }
@@ -109,87 +111,63 @@ END
 
 FUNCTION(OS_popenImpl, ARG_UTF8(command))
 {
-    // save stdin, stdout, stderr
-    int oldstdin  = dup(STDIN_FILENO);
-    int oldstdout = dup(STDOUT_FILENO);
-    int oldstderr = dup(STDERR_FILENO);
-    
-    if (oldstdin < 0 || oldstdout < 0 || oldstderr < 0)
-        THROW("popen error (dup): %s", strerror(errno));
-    
     int outfd[2];
     int infd[2];
     int errfd[2];
     
-    // create pipes for subprocess's stdin, stdout, stderr
+    // create pipes for subprocess' stdin, stdout, stderr
     if (pipe(outfd) < 0) // From where parent is going to read
         THROW("popen error (pipe): %s", strerror(errno));
     if (pipe(infd) < 0) // Where the parent is going to write to
         THROW("popen error (pipe): %s", strerror(errno));
     if (pipe(errfd) < 0) // Where the parent is going to write to
          THROW("popen error (pipe): %s", strerror(errno));
-    
-    // close existing stdin, stdout, stderr
-    if (close(STDIN_FILENO) < 0)
-        THROW("popen error (close): %s", strerror(errno));
-    if (close(STDOUT_FILENO) < 0)
-        THROW("popen error (close): %s", strerror(errno));
-    if (close(STDERR_FILENO) < 0)
-        THROW("popen error (close): %s", strerror(errno));
-    
-    // set correct endpoint of pipes to stdin, stdout, stderr
-    if (dup2(infd[0], STDIN_FILENO)  < 0) // Make the read end of infd pipe as stdin
-        THROW("popen error (dup2): %s", strerror(errno));
-    if (dup2(outfd[1],  STDOUT_FILENO) < 0) // Make the write end of outfd as stdout
-        THROW("popen error (dup2): %s", strerror(errno));
-    if (dup2(errfd[1], STDERR_FILENO) < 0) // Make the write end of outfd as stdout
-        THROW("popen error (dup2): %s", strerror(errno));
-    
-    if (close(infd[0]) < 0)
-        THROW("popen error (close): %s", strerror(errno));
-    if (close(outfd[1]) < 0)
-        THROW("popen error (close): %s", strerror(errno));
-    if (close(errfd[1]) < 0)
-        THROW("popen error (close): %s", strerror(errno));
-        
+
     pid_t pid = fork();
     if(!pid)
     {
         // In the forked process:
+
+        // close other end of pipes
+        close(infd[1]);
+        close(outfd[0]);
+        close(errfd[0]);
+        
+        // close existing stdin, stdout, stderr
+        close(STDIN_FILENO);
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
+            
+        // set correct endpoints of pipes to stdin, stdout, stderr
+        dup2(infd[0], STDIN_FILENO);
+        dup2(outfd[1], STDOUT_FILENO);
+        dup2(errfd[1], STDERR_FILENO);
+        
+        // close originals
+        close(infd[0]);
+        close(outfd[1]);
+        close(errfd[1]);
+        
+        
         char *argv[] = {
             "/bin/sh",
             "-c",
             command,
             NULL
         };
-        
-        if (close(infd[1]) < 0)
-            THROW("popen error (close): %s", strerror(errno));
-        if (close(outfd[0]) < 0)
-            THROW("popen error (close): %s", strerror(errno));
-        if (close(errfd[0]) < 0)
-            THROW("popen error (close): %s", strerror(errno));
     
         execv(argv[0], argv);
     }
     else
     {
-        // In the forking process:
-        if (close(STDIN_FILENO) < 0)
+        // close other end of pipes
+        if (close(infd[0]) < 0)
             THROW("popen error (close): %s", strerror(errno));
-        if (close(STDOUT_FILENO) < 0)
+        if (close(outfd[1]) < 0)
             THROW("popen error (close): %s", strerror(errno));
-        if (close(STDERR_FILENO) < 0)
+        if (close(errfd[1]) < 0)
             THROW("popen error (close): %s", strerror(errno));
-        
-        // restore stdin, stdout, stderr
-        if (dup2(oldstdin, STDIN_FILENO) < 0)
-            THROW("popen error (dup2): %s", strerror(errno));
-        if (dup2(oldstdout, STDOUT_FILENO) < 0)
-            THROW("popen error (dup2): %s", strerror(errno));
-        if (dup2(oldstderr, STDERR_FILENO) < 0)
-           THROW("popen error (dup2): %s", strerror(errno));
-    
+            
         NWObject obj = CALL(Popen_new, pid, infd[1], outfd[0], errfd[0]);
         
         ARGS_ARRAY(stdinArgs, JS_int(-1), JS_int(infd[1]));
