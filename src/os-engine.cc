@@ -38,8 +38,51 @@ FUNCTION(OS_systemImpl, ARG_UTF8(command))
 END
 
 typedef struct __PopenPrivate {
-    pid_t pid;
+    pid_t   pid;
+    int     infd;
+    int     outfd;
+    int     errfd;
 } PopenPrivate;
+
+DESTRUCTOR(Popen_finalize)
+{    
+    GET_INTERNAL(PopenPrivate *, data, object);
+    DEBUG("Popen_finalize=[%p]\n", data);
+    if (data) {
+        if (data->infd >= 0) close(data->infd);
+        if (data->outfd >= 0) close(data->outfd);
+        if (data->errfd >= 0) close(data->errfd);
+        free(data);
+    }
+}
+END
+
+JSClassRef Popen_class(JSContextRef _context)
+{
+    static JSClassRef jsClass;
+    if (!jsClass)
+    {
+        JSClassDefinition definition = kJSClassDefinitionEmpty;
+        definition.className = "Popen";
+        definition.finalize = Popen_finalize;
+
+        jsClass = JSClassCreate(&definition);
+    }
+    return jsClass;
+}
+
+JSObjectRef Popen_new(JSContextRef _context, JSValueRef *_exception, pid_t pid, int infd, int outfd, int errfd)
+{
+    PopenPrivate *data = (PopenPrivate*)malloc(sizeof(PopenPrivate));
+    if (!data) return NULL;
+    
+    data->pid   = pid;
+    data->infd  = infd;
+    data->outfd = outfd;
+    data->errfd = errfd;
+    
+    return JSObjectMake(_context, Popen_class(_context), data);
+}
 
 FUNCTION(Popen_wait)
 {
@@ -66,33 +109,53 @@ END
 
 FUNCTION(OS_popenImpl, ARG_UTF8(command))
 {
-    int oldstdin  = dup(STDIN_FILENO); // Save current stdin
-    int oldstdout = dup(STDOUT_FILENO); // Save stdout
-    int oldstderr = dup(STDERR_FILENO); // Save stdout
+    // save stdin, stdout, stderr
+    int oldstdin  = dup(STDIN_FILENO);
+    int oldstdout = dup(STDOUT_FILENO);
+    int oldstderr = dup(STDERR_FILENO);
     
-    int infd[2];
+    if (oldstdin < 0 || oldstdout < 0 || oldstderr < 0)
+        THROW("popen error (dup): %s", strerror(errno));
+    
     int outfd[2];
+    int infd[2];
     int errfd[2];
-
-    pipe(infd); // From where parent is going to read
-    pipe(outfd); // Where the parent is going to write to
-    pipe(errfd); // Where the parent is going to write to
-
-    close(STDIN_FILENO);
-    close(STDOUT_FILENO);
-    close(STDERR_FILENO);
-
-    dup2(outfd[0], STDIN_FILENO); // Make the read end of outfd pipe as stdin
-    dup2(infd[1], STDOUT_FILENO); // Make the write end of infd as stdout
-    dup2(errfd[1], STDERR_FILENO); // Make the write end of infd as stdout
-
-    PopenPrivate *data = (PopenPrivate *)malloc(sizeof(PopenPrivate));
-    if (!data)
-        THROW("OOM");
-
-    data->pid = fork();
-    if(!data->pid)
+    
+    // create pipes for subprocess's stdin, stdout, stderr
+    if (pipe(outfd) < 0) // From where parent is going to read
+        THROW("popen error (pipe): %s", strerror(errno));
+    if (pipe(infd) < 0) // Where the parent is going to write to
+        THROW("popen error (pipe): %s", strerror(errno));
+    if (pipe(errfd) < 0) // Where the parent is going to write to
+         THROW("popen error (pipe): %s", strerror(errno));
+    
+    // close existing stdin, stdout, stderr
+    if (close(STDIN_FILENO) < 0)
+        THROW("popen error (close): %s", strerror(errno));
+    if (close(STDOUT_FILENO) < 0)
+        THROW("popen error (close): %s", strerror(errno));
+    if (close(STDERR_FILENO) < 0)
+        THROW("popen error (close): %s", strerror(errno));
+    
+    // set correct endpoint of pipes to stdin, stdout, stderr
+    if (dup2(infd[0], STDIN_FILENO)  < 0) // Make the read end of infd pipe as stdin
+        THROW("popen error (dup2): %s", strerror(errno));
+    if (dup2(outfd[1],  STDOUT_FILENO) < 0) // Make the write end of outfd as stdout
+        THROW("popen error (dup2): %s", strerror(errno));
+    if (dup2(errfd[1], STDERR_FILENO) < 0) // Make the write end of outfd as stdout
+        THROW("popen error (dup2): %s", strerror(errno));
+    
+    if (close(infd[0]) < 0)
+        THROW("popen error (close): %s", strerror(errno));
+    if (close(outfd[1]) < 0)
+        THROW("popen error (close): %s", strerror(errno));
+    if (close(errfd[1]) < 0)
+        THROW("popen error (close): %s", strerror(errno));
+        
+    pid_t pid = fork();
+    if(!pid)
     {
+        // In the forked process:
         char *argv[] = {
             "/bin/sh",
             "-c",
@@ -100,44 +163,42 @@ FUNCTION(OS_popenImpl, ARG_UTF8(command))
             NULL
         };
         
-        close(infd[0]);
-        close(infd[1]);
-        close(outfd[0]);
-        close(outfd[1]);
-        close(errfd[0]);
-        close(errfd[1]);
-
+        if (close(infd[1]) < 0)
+            THROW("popen error (close): %s", strerror(errno));
+        if (close(outfd[0]) < 0)
+            THROW("popen error (close): %s", strerror(errno));
+        if (close(errfd[0]) < 0)
+            THROW("popen error (close): %s", strerror(errno));
+    
         execv(argv[0], argv);
     }
     else
     {
-        close(STDIN_FILENO);
-        close(STDOUT_FILENO);
-        close(STDERR_FILENO);
+        // In the forking process:
+        if (close(STDIN_FILENO) < 0)
+            THROW("popen error (close): %s", strerror(errno));
+        if (close(STDOUT_FILENO) < 0)
+            THROW("popen error (close): %s", strerror(errno));
+        if (close(STDERR_FILENO) < 0)
+            THROW("popen error (close): %s", strerror(errno));
         
-        dup2(oldstdin, STDIN_FILENO);
-        dup2(oldstdout, STDOUT_FILENO);
-        dup2(oldstderr, STDERR_FILENO);
-
-        close(outfd[0]);
-        close(infd[1]);
-        close(errfd[1]);
-
-        // FIXME!
-#ifdef NARWHAL_JSC
-        NWObject obj = JSObjectMake(_context, Custom_class(_context), data);
-#elif NARWHAL_V8
-        THROW("popen not yet implemented for V8");
-        NWObject obj = v8::Object::New();
-#endif
+        // restore stdin, stdout, stderr
+        if (dup2(oldstdin, STDIN_FILENO) < 0)
+            THROW("popen error (dup2): %s", strerror(errno));
+        if (dup2(oldstdout, STDOUT_FILENO) < 0)
+            THROW("popen error (dup2): %s", strerror(errno));
+        if (dup2(oldstderr, STDERR_FILENO) < 0)
+           THROW("popen error (dup2): %s", strerror(errno));
+    
+        NWObject obj = CALL(Popen_new, pid, infd[1], outfd[0], errfd[0]);
         
-        ARGS_ARRAY(stdinArgs, JS_int(-1), JS_int(outfd[0]));
+        ARGS_ARRAY(stdinArgs, JS_int(-1), JS_int(infd[1]));
         NWObject stdinObj = CALL_AS_CONSTRUCTOR(IO, 2, stdinArgs);
         HANDLE_EXCEPTION(true, true);
         SET_VALUE(obj, "stdin", stdinObj);
         HANDLE_EXCEPTION(true, true);
         
-        ARGS_ARRAY(stdoutArgs, JS_int(infd[0]), JS_int(-1));
+        ARGS_ARRAY(stdoutArgs, JS_int(outfd[0]), JS_int(-1));
         NWObject stdoutObj = CALL_AS_CONSTRUCTOR(IO, 2, stdoutArgs);
         HANDLE_EXCEPTION(true, true);
         SET_VALUE(obj, "stdout", stdoutObj);
