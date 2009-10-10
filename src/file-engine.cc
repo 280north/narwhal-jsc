@@ -188,7 +188,7 @@ FUNCTION(F_symlink, ARG_UTF8_CAST(source), ARG_UTF8_CAST(target))
 }
 END
 
-FUNCTION(F_rename, ARG_UTF8_CAST(source), ARG_UTF8_CAST(target))
+FUNCTION(F_renameImpl, ARG_UTF8_CAST(source), ARG_UTF8_CAST(target))
 {
     ARG_COUNT(2);
 
@@ -361,8 +361,9 @@ NARWHAL_MODULE(file_engine)
     EXPORTS("chown", JS_fn(F_chown));
     EXPORTS("link", JS_fn(F_link));
     EXPORTS("symlink", JS_fn(F_symlink));
-    EXPORTS("rename", JS_fn(F_rename));
-    EXPORTS("move", JS_fn(F_rename));
+    //EXPORTS("rename", JS_fn(F_rename));
+    //EXPORTS("move", JS_fn(F_rename));
+    EXPORTS("renameImpl", JS_fn(F_renameImpl));
     //EXPORTS("move", JS_fn(F_move));
     EXPORTS("remove", JS_fn(F_remove));
     EXPORTS("mkdir", JS_fn(F_mkdir));
@@ -376,5 +377,7 @@ NARWHAL_MODULE(file_engine)
     NWObject file_engine_js = require("file-engine.js");
     EXPORTS("mkdirs", GET_VALUE(file_engine_js, "mkdirs"));
     EXPORTS("touch", GET_VALUE(file_engine_js, "touch"));
+    EXPORTS("rename", GET_VALUE(file_engine_js, "rename"));
+    EXPORTS("move", GET_VALUE(file_engine_js, "rename"));
 }
 END_NARWHAL_MODULE
