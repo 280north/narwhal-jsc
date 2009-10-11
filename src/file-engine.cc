@@ -27,7 +27,7 @@ FUNCTION(F_cwd)
 }
 END
 
-FUNCTION(F_canonical, ARG_UTF8_CAST(path))
+FUNCTION(F_canonicalImpl, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
     
@@ -36,7 +36,7 @@ FUNCTION(F_canonical, ARG_UTF8_CAST(path))
 
     char *canon = realpath(path, resolved_name);
     if (!canon)
-        THROW("Canonical failed!");
+        return JS_str_utf8(path, strlen(path));
 
     return JS_str_utf8(canon, strlen(canon));
 }
@@ -346,7 +346,8 @@ NARWHAL_MODULE(file_engine)
     EXPORTS("FileIO", JS_fn(F_FileIO));
     
     EXPORTS("cwd", JS_fn(F_cwd));
-    EXPORTS("canonical", JS_fn(F_canonical));
+    //EXPORTS("canonical", JS_fn(F_canonical));
+    EXPORTS("canonicalImpl", JS_fn(F_canonicalImpl));
     EXPORTS("mtime", JS_fn(F_mtime));
     EXPORTS("size", JS_fn(F_size));
     EXPORTS("stat", JS_fn(F_stat));
@@ -379,5 +380,6 @@ NARWHAL_MODULE(file_engine)
     EXPORTS("touch", GET_VALUE(file_engine_js, "touch"));
     EXPORTS("rename", GET_VALUE(file_engine_js, "rename"));
     EXPORTS("move", GET_VALUE(file_engine_js, "rename"));
+    EXPORTS("canonical", GET_VALUE(file_engine_js, "canonical"));
 }
 END_NARWHAL_MODULE
