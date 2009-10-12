@@ -39,9 +39,6 @@ END
 
 typedef struct __PopenPrivate {
     pid_t   pid;
-    int     infd;
-    int     outfd;
-    int     errfd;
 } PopenPrivate;
 
 DESTRUCTOR(Popen_finalize)
@@ -49,10 +46,11 @@ DESTRUCTOR(Popen_finalize)
     GET_INTERNAL(PopenPrivate *, data, object);
     DEBUG("Popen_finalize=[%p]\n", data);
     if (data) {
-        // these will be closed by the IO object's finalize method:
-        // if (data->infd >= 0) close(data->infd);
-        // if (data->outfd >= 0) close(data->outfd);
-        // if (data->errfd >= 0) close(data->errfd);
+        
+        // call waitpid (not blocking) to avoid zombie processes
+        // TODO: if this finalizer is called before the process exits the process will be a zombie
+        int status;
+        pid_t pid = waitpid(data->pid, &status, WUNTRACED|WNOHANG);
         
         free(data);
     }
@@ -73,15 +71,12 @@ JSClassRef Popen_class(JSContextRef _context)
     return jsClass;
 }
 
-JSObjectRef Popen_new(JSContextRef _context, JSValueRef *_exception, pid_t pid, int infd, int outfd, int errfd)
+JSObjectRef Popen_new(JSContextRef _context, JSValueRef *_exception, pid_t pid)
 {
     PopenPrivate *data = (PopenPrivate*)malloc(sizeof(PopenPrivate));
     if (!data) return NULL;
     
-    data->pid   = pid;
-    data->infd  = infd;
-    data->outfd = outfd;
-    data->errfd = errfd;
+    data->pid = pid;
     
     return JSObjectMake(_context, Popen_class(_context), data);
 }
@@ -121,7 +116,7 @@ FUNCTION(OS_popenImpl, ARG_UTF8(command))
     if (pipe(infd) < 0) // Where the parent is going to write to
         THROW("popen error (pipe): %s", strerror(errno));
     if (pipe(errfd) < 0) // Where the parent is going to write to
-         THROW("popen error (pipe): %s", strerror(errno));
+        THROW("popen error (pipe): %s", strerror(errno));
 
     pid_t pid = fork();
     if(!pid)
@@ -168,7 +163,7 @@ FUNCTION(OS_popenImpl, ARG_UTF8(command))
         if (close(errfd[1]) < 0)
             THROW("popen error (close): %s", strerror(errno));
             
-        NWObject obj = CALL(Popen_new, pid, infd[1], outfd[0], errfd[0]);
+        NWObject obj = CALL(Popen_new, pid);
         
         ARGS_ARRAY(stdinArgs, JS_int(-1), JS_int(infd[1]));
         NWObject stdinObj = CALL_AS_CONSTRUCTOR(IO, 2, stdinArgs);
