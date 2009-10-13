@@ -537,8 +537,9 @@ FUNCTION(Jill_run, ARG_FN(app))
             *_exception = NULL;
         }
     }
-    fprintf(stderr, "Jack is starting up using Jill on port %d", port);
-    
+    fprintf(stdout, "Jack is starting up using Jill on port %d\n", port);
+    fflush(stdout);
+
     int server_socket, client_socket;
     struct sockaddr_in server_address, client_address;
     
