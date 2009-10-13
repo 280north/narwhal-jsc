@@ -319,20 +319,20 @@ FUNCTION(F_FileIO, ARG_UTF8_CAST(path))
         int fd = open(path, oflag | O_CREAT, 0777);
         DEBUG("fd=%d\n", fd);
         if (fd < 0)
-            THROW("No such file or directory.");
+            THROW("%s", strerror(errno));
         ARGS_ARRAY(argv, JS_int(-1), JS_int(fd));
         return TO_OBJECT(CALL_AS_CONSTRUCTOR(IO, 2, argv));
     } else if (readFlag) {
         int fd = open(path, oflag);
         DEBUG("fd=%d\n", fd);
         if (fd < 0)
-            THROW("No such file or directory.");
+            THROW("%s", strerror(errno));
         ARGS_ARRAY(argv, JS_int(fd), JS_int(-1));
         return CALL_AS_CONSTRUCTOR(IO, 2, argv);
     } else {
         THROW("Files must be opened either for read, write, or update mode.");
     }
-    printf("done");
+    
     return JS_undefined;
 }
 END
