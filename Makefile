@@ -74,11 +74,8 @@ lib/jack/handler/mongoose.dylib: src/jack/handler/mongoose.cc mongoose.o
 	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(LIBS) mongoose.o
 	#install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" "$@"
 
-deps/http-parser/http_parser.o: deps/http-parser
+deps/http-parser/http_parser.o:
 	cd deps/http-parser && make http_parser.o
-
-deps/http-parser:
-	git clone git://github.com/ry/http-parser.git $@
 
 lib/jack/handler/jill.dylib: src/jack/handler/jill.cc deps/http-parser/http_parser.o lib/io-engine.dylib lib/binary-engine.dylib
 	mkdir -p `dirname $@`
