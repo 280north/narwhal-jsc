@@ -48,8 +48,12 @@ FUNCTION(F_mtime, ARG_UTF8_CAST(path))
     
 	struct stat stat_info;
     int ret = stat(path, &stat_info);
+    if (ret < 0)
+        THROW("mtime: %s", strerror(errno));
+    
+    long long timestamp = ((long long)(stat_info.st_mtime)) * 1000;
 
-    return JS_date(stat_info.st_mtime * 1000);
+    return JS_date(timestamp);
 }
 END
 
@@ -276,13 +280,13 @@ FUNCTION(F_list, ARG_UTF8_CAST(path))
 }
 END
 
-FUNCTION(F_touch, ARG_UTF8_CAST(path), ARG_DOUBLE(mtime))
+FUNCTION(F_touchImpl, ARG_UTF8_CAST(path), ARG_DOUBLE(mtime))
 {
     ARG_COUNT(2);
 
     struct utimbuf times;
-    times.actime = (time_t)mtime;
-    times.modtime = (time_t)mtime;
+    times.actime = (time_t)(mtime/1000.0);
+    times.modtime = (time_t)(mtime/1000.0);
     
     if (utime(path, &times) < 0)
         THROW("unable to set mtime of %s: %s", path, strerror(errno));
@@ -372,7 +376,7 @@ NARWHAL_MODULE(file_engine)
     EXPORTS("rmdir", JS_fn(F_rmdir));
     EXPORTS("listImpl", JS_fn(F_list));
     //EXPORTS("list", JS_fn(F_list));
-    EXPORTS("touchImpl", JS_fn(F_touch));
+    EXPORTS("touchImpl", JS_fn(F_touchImpl));
     //EXPORTS("touch", JS_fn(F_touch));
     
     NWObject file_engine_js = require("file-engine.js");

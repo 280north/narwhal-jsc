@@ -179,7 +179,7 @@ JSValueRef _TO_STRING(JSContextRef _context, JSValueRef *_exception, JSValueRef 
     ARGN_UTF8_CAST(variable, index)
 
 #define ARG_INT(variable)       0; ARGN_INT(variable, _argn); _argn++; 0
-#define ARG_DOUBLE(variable)    0; ARGN_INT(variable, _argn); _argn++; 0
+#define ARG_DOUBLE(variable)    0; ARGN_DOUBLE(variable, _argn); _argn++; 0
 #define ARG_OBJ(variable)       0; ARGN_OBJ(variable, _argn); _argn++; 0
 #define ARG_FN(variable)        0; ARGN_FN(variable, _argn); _argn++; 0
 #define ARG_STR(variable)       0; ARGN_STR(variable, _argn); _argn++; 0
@@ -198,8 +198,8 @@ JSValueRef _TO_STRING(JSContextRef _context, JSValueRef *_exception, JSValueRef 
 #define JS_array(count, array) JSObjectMakeArray(_context, count, array, _exception)
 
 #define JS_date(ms) _JS_date(_context, _exception, ms)
-NWValue _JS_date(JSContextRef _context, JSValueRef* _exception, int ms) {
-    JSValueRef argv[] = { JS_int(ms) };
+NWValue _JS_date(JSContextRef _context, JSValueRef* _exception, long long usec) {
+    JSValueRef argv[] = { JS_int(usec) };
     return JSObjectMakeDate(_context, 1, argv, _exception);
 }
 
