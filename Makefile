@@ -1,5 +1,5 @@
 CPP       =g++
-CPPFLAGS   = -0s
+CPPFLAGS   = -0s -arch i386
 #CPPFLAGS += -g -O0
 #CPPFLAGS += -DDEBUG_ON
 #CPPFLAGS += -save-temps
@@ -114,6 +114,7 @@ $(JSCOCOA_CHECKOUT):
 clean:
 	find lib -name "*.dylib" -exec rm -rf {} \;
 	rm -rf bin/narwhal-jsc* bin/*.dylib bin/*.dSYM lib/*.dylib lib/*.dSYM $(EXECUTABLE) *.o *.ii *.s
+	cd deps/http-parser && make clean
 
 cleaner: clean
 	rm -rf $(JSCORE_FRAMEWORK) $(JSCOCOA_FRAMEWORK) $(JSCORE_BUILD) $(JSCOCOA_BUILD)
