@@ -128,7 +128,7 @@ FUNCTION(F_isLink, ARG_UTF8_CAST(path))
     ARG_COUNT(1);
 
 	struct stat stat_info;
-    int ret = stat(path, &stat_info);
+    int ret = lstat(path, &stat_info);
 
     return JS_bool(ret != -1 && S_ISLNK(stat_info.st_mode));
 }
