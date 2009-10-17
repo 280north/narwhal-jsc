@@ -5,17 +5,14 @@ Setup
 -----
 
     git clone git://github.com/tlrobinson/narwhal.git narwhal
-    cd narwhal/platforms
+    cd narwhal/engines
     git clone git://github.com/tlrobinson/narwhal-jsc.git jsc
     cd jsc
-    make jscocoa
+    make
     cd ../..
-    NARWHAL_PLATFORM=jsc bin/narwhal
+    NARWHAL_ENGINE=jsc bin/narwhal
 
-Example
--------
+Notes
+-----
 
-    o = NSObject.alloc.init
-    o.description
-    
-Better examples forthcoming.
+* Only builds on Mac OS X and JSCocoa support is currently broken, but both of these things can be fixed with improved Makefiles (or Jakefiles)

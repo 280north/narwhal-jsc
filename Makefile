@@ -32,7 +32,7 @@ JSCOCOA_FRAMEWORK=$(FRAMEWORKS_DIR)/JSCocoa.framework
 JSCOCOA_BUILD=deps/JSCocoa/JSCocoa/build/Release/JSCocoa.framework
 JSCOCOA_CHECKOUT=deps/JSCocoa
 
-all: frameworks jsc modules rewrite-lib-paths
+all: jsc modules rewrite-lib-paths
 jscocoa: frameworks-jscocoa jsc-jscocoa modules rewrite-lib-paths
 webkit: jsc-webkit modules rewrite-lib-paths
 
