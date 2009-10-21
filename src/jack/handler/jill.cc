@@ -15,8 +15,9 @@
 
 #include <narwhal.h>
 
-#include <sys/socket.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #include "../../../deps/http-parser/http_parser.h"
@@ -60,6 +61,9 @@ typedef struct _client_data {
     ssize_t bodyOff;
     ssize_t bodyLen;
     
+    NWString SERVER_NAME;
+    NWString SERVER_PORT;
+    
     int     complete;
 } client_data;
 
@@ -87,6 +91,19 @@ NWValue processHeader(
             SET_VALUE(env, buffer + 5, JS_str_utf8(hValue, data->hValueLen));
         } else {
             SET_VALUE(env, buffer, JS_str_utf8(hValue, data->hValueLen));
+
+            if (!strcmp("HTTP_HOST", buffer)) {
+                // if there's a colon we can split into SERVER_NAME and SERVER_PORT
+                char *colonPtr = (char *)memchr(hValue, ':', data->hValueLen);
+                if (colonPtr) {
+                    *colonPtr = '\0';
+                    data->SERVER_NAME = JS_str_utf8(hValue, colonPtr - hValue);
+                    data->SERVER_PORT = JS_str_utf8(colonPtr + 1, data->hValueLen - (colonPtr + 1));
+                    *colonPtr = ':'; // restore colon
+                } else {
+                    data->SERVER_NAME = JS_str_utf8(hValue, data->hValueLen);
+                }
+            }
         }
         
         data->hNameOff = -1;
@@ -207,22 +224,27 @@ NWValue handlerWrapper(
     HANDLE_EXCEPTION(true, true);
     
     // SERVER_NAME
-    SET_VALUE(env, "SERVER_NAME", JS_str_utf8("", 0));
+    SET_VALUE(env, "SERVER_NAME", data->SERVER_NAME ? data->SERVER_NAME : JS_str_utf8("", 0));
     HANDLE_EXCEPTION(true, true);
     
     // SERVER_PORT
-    SET_VALUE(env, "SERVER_PORT", JS_str_utf8("", 0));
+    SET_VALUE(env, "SERVER_PORT", data->SERVER_PORT ? data->SERVER_PORT : JS_str_utf8("", 0));
     HANDLE_EXCEPTION(true, true);
     
-    // REMOTE_USER
-    //SET_VALUE(env, "REMOTE_USER", JS_str_utf8(info->remote_user, strlen(info->remote_user)));
-    //HANDLE_EXCEPTION(true, true);
-    
     // REMOTE_ADDR
-    //long ip = info->remote_ip;
-    //snprintf(buffer, sizeof(buffer), "%hu.%hu.%hu.%hu", (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF);
-    //SET_VALUE(env, "REMOTE_ADDR", JS_str_utf8(buffer, strlen(buffer)));
-    //HANDLE_EXCEPTION(true, true);
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_len = sizeof(client_addr);
+    if (getpeername(data->fd, (struct sockaddr*)&client_addr, &client_addr_len) == 0) {
+        char *ip_buffer = inet_ntoa(client_addr.sin_addr);
+        if (ip_buffer) {
+            SET_VALUE(env, "REMOTE_USER", JS_str_utf8(ip_buffer, strlen(ip_buffer)));
+            HANDLE_EXCEPTION(true, true);
+        } else {
+            DEBUG("inet_ntoa failed\n");
+        }
+    } else {
+        DEBUG("getpeername failed\n");
+    }
     
     // jsgi.version
     ARGS_ARRAY(argvVersion, JS_int(0), JS_int(2));
