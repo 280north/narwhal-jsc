@@ -312,25 +312,39 @@ FUNCTION(F_FileIO, ARG_UTF8_CAST(path))
     
     int oflag = 0;
     
-    if (readFlag)   oflag = oflag | O_RDONLY;
-    if (writeFlag)  oflag = oflag | O_WRONLY;
-    if (appendFlag) oflag = oflag | O_APPEND;
-    if (updateFlag) oflag = oflag | O_RDONLY;
+    if (readFlag && writeFlag)
+        oflag = oflag | O_RDWR;
+    else if (writeFlag)
+        oflag = oflag | O_WRONLY;
+    else if (readFlag)
+        oflag = oflag | O_RDONLY;
+        
+    if (appendFlag)
+        oflag = oflag | O_APPEND;
+    // if (!updateFlag)
+    //     oflag = oflag | O_TRUNC;
     
     if (updateFlag) {
         THROW("Updating IO not yet implemented.");
     } else if (writeFlag || appendFlag) {
-        int fd = open(path, oflag | O_CREAT, 0777);
+        oflag = oflag | O_CREAT;
+        if (!(oflag & O_APPEND))
+            oflag = oflag | O_TRUNC;
+
+        int fd = open(path, oflag, 0644);
         DEBUG("fd=%d\n", fd);
         if (fd < 0)
             THROW("%s", strerror(errno));
+
         ARGS_ARRAY(argv, JS_int(-1), JS_int(fd));
         return TO_OBJECT(CALL_AS_CONSTRUCTOR(IO, 2, argv));
     } else if (readFlag) {
+
         int fd = open(path, oflag);
         DEBUG("fd=%d\n", fd);
         if (fd < 0)
             THROW("%s", strerror(errno));
+
         ARGS_ARRAY(argv, JS_int(fd), JS_int(-1));
         return CALL_AS_CONSTRUCTOR(IO, 2, argv);
     } else {
