@@ -264,7 +264,7 @@ FUNCTION(F_list, ARG_UTF8_CAST(path))
     struct dirent *dirp;
 
     if((dp  = opendir(strlen(path) == 0 ? "." : path)) == NULL) {
-        THROW("No such directory");
+        THROW("%s", strerror(errno));
     }
 
     NWObject array = JS_array(0, NULL);
