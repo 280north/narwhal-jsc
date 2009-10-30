@@ -10,6 +10,8 @@
 #include <unistd.h>
 #include <utime.h>
 
+#define PATH_OR_DOT(path) (path[0] == '\0' ? "." : path)
+
 NWObject io;
 
 FUNCTION(F_cwd)
@@ -34,7 +36,7 @@ FUNCTION(F_canonicalImpl, ARG_UTF8_CAST(path))
     // FIXME: http://insanecoding.blogspot.com/2007/11/pathmax-simply-isnt.html
     char resolved_name[PATH_MAX];
 
-    char *canon = realpath(path, resolved_name);
+    char *canon = realpath(PATH_OR_DOT(path), resolved_name);
     if (!canon)
         return JS_str_utf8(path, strlen(path));
 
@@ -47,7 +49,7 @@ FUNCTION(F_mtime, ARG_UTF8_CAST(path))
     ARG_COUNT(1);
     
 	struct stat stat_info;
-    int ret = stat(path, &stat_info);
+    int ret = stat(PATH_OR_DOT(path), &stat_info);
     if (ret < 0)
         THROW("mtime: %s", strerror(errno));
     
@@ -62,7 +64,7 @@ FUNCTION(F_size, ARG_UTF8_CAST(path))
     ARG_COUNT(1);
     
 	struct stat stat_info;
-    int ret = stat(path, &stat_info);
+    int ret = stat(PATH_OR_DOT(path), &stat_info);
     
     return JS_int(stat_info.st_size);
 }
@@ -73,7 +75,7 @@ FUNCTION(F_stat, ARG_UTF8_CAST(path))
     ARG_COUNT(1);
 
 	struct stat stat_info;
-    int ret = stat(path, &stat_info);
+    int ret = stat(PATH_OR_DOT(path), &stat_info);
     
     return JS_undefined;
 }
@@ -84,7 +86,7 @@ FUNCTION(F_exists, ARG_UTF8_CAST(path))
     ARG_COUNT(1);
 
 	struct stat stat_info;
-    int ret = stat(path, &stat_info);
+    int ret = stat(PATH_OR_DOT(path), &stat_info);
     
     return JS_bool(ret != -1);
 }
@@ -95,7 +97,7 @@ FUNCTION(F_linkExists, ARG_UTF8_CAST(path))
     ARG_COUNT(1);
 
 	struct stat stat_info;
-    int ret = stat(path, &stat_info);
+    int ret = stat(PATH_OR_DOT(path), &stat_info);
 
     return JS_bool(ret != -1 && (S_ISREG(stat_info.st_mode) || S_ISLNK(stat_info.st_mode)));
 }
@@ -106,7 +108,7 @@ FUNCTION(F_isDirectory, ARG_UTF8_CAST(path))
     ARG_COUNT(1);
 
 	struct stat stat_info;
-    int ret = stat(path, &stat_info);
+    int ret = stat(PATH_OR_DOT(path), &stat_info);
 
     return JS_bool(ret != -1 && S_ISDIR(stat_info.st_mode));
 }
@@ -117,7 +119,7 @@ FUNCTION(F_isFile, ARG_UTF8_CAST(path))
     ARG_COUNT(1);
 
 	struct stat stat_info;
-    int ret = stat(path, &stat_info);
+    int ret = stat(PATH_OR_DOT(path), &stat_info);
 
     return JS_bool(ret != -1 && S_ISREG(stat_info.st_mode));
 }
@@ -128,7 +130,7 @@ FUNCTION(F_isLink, ARG_UTF8_CAST(path))
     ARG_COUNT(1);
 
 	struct stat stat_info;
-    int ret = lstat(path, &stat_info);
+    int ret = lstat(PATH_OR_DOT(path), &stat_info);
 
     return JS_bool(ret != -1 && S_ISLNK(stat_info.st_mode));
 }
@@ -138,7 +140,7 @@ FUNCTION(F_isReadable, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
     
-    return JS_bool(access(path, R_OK) == 0);
+    return JS_bool(access(PATH_OR_DOT(path), R_OK) == 0);
 }
 END
 
@@ -146,7 +148,7 @@ FUNCTION(F_isWritable, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
     
-    return JS_bool(access(path, W_OK) == 0);
+    return JS_bool(access(PATH_OR_DOT(path), W_OK) == 0);
 }
 END
 
@@ -154,7 +156,7 @@ FUNCTION(F_chmod, ARG_UTF8_CAST(path), ARG_INT(mode))
 {
     ARG_COUNT(2);
     
-    if (chmod(path, mode) < 0)
+    if (chmod(PATH_OR_DOT(path), mode) < 0)
         THROW("failed to chmod %s", path);
     
     return JS_undefined;
@@ -185,7 +187,7 @@ FUNCTION(F_symlink, ARG_UTF8_CAST(source), ARG_UTF8_CAST(target))
 {
     ARG_COUNT(2);
     
-    if (symlink(source, target) < 0)
+    if (symlink(PATH_OR_DOT(source), PATH_OR_DOT(target)) < 0)
         THROW("failed to symlink %s to %s", source, target);
 
     return JS_undefined;
@@ -196,7 +198,7 @@ FUNCTION(F_renameImpl, ARG_UTF8_CAST(source), ARG_UTF8_CAST(target))
 {
     ARG_COUNT(2);
 
-    if (rename(source, target) < 0)
+    if (rename(PATH_OR_DOT(source), PATH_OR_DOT(target)) < 0)
         THROW("failed to rename %s to %s", source, target);
 
     return JS_undefined;
@@ -217,7 +219,7 @@ FUNCTION(F_remove, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
     
-    if (unlink(path) < 0)
+    if (unlink(PATH_OR_DOT(path)) < 0)
         THROW("failed to delete %s: %s", path, strerror(errno));
 
     return JS_undefined;
@@ -228,7 +230,7 @@ FUNCTION(F_mkdir, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
     
-    if (mkdir(path, 0777) < 0) {
+    if (mkdir(PATH_OR_DOT(path), 0777) < 0) {
         // TODO: Should this fail
         THROW("failed to make directory %s: %s", path, strerror(errno));
     }
@@ -251,7 +253,7 @@ FUNCTION(F_rmdir, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
 
-    if (rmdir(path) < 0)
+    if (rmdir(PATH_OR_DOT(path)) < 0)
         THROW("failed to remove the directory %s: %s", path, strerror(errno));
 
     return JS_undefined;
@@ -263,7 +265,7 @@ FUNCTION(F_list, ARG_UTF8_CAST(path))
     DIR *dp;
     struct dirent *dirp;
 
-    if((dp  = opendir(strlen(path) == 0 ? "." : path)) == NULL) {
+    if((dp  = opendir(PATH_OR_DOT(path))) == NULL) {
         THROW("%s", strerror(errno));
     }
 
@@ -288,7 +290,7 @@ FUNCTION(F_touchImpl, ARG_UTF8_CAST(path), ARG_DOUBLE(mtime))
     times.actime = (time_t)(mtime/1000.0);
     times.modtime = (time_t)(mtime/1000.0);
     
-    if (utime(path, &times) < 0)
+    if (utime(PATH_OR_DOT(path), &times) < 0)
         THROW("unable to set mtime of %s: %s", path, strerror(errno));
 
     return JS_undefined;
