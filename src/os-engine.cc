@@ -33,7 +33,8 @@ END
 
 FUNCTION(OS_systemImpl, ARG_UTF8(command))
 {
-    return JS_int(system(command));
+    int status = system(command);
+    return JS_int(WEXITSTATUS(status));
 }
 END
 
