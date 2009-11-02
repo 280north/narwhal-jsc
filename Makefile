@@ -1,5 +1,5 @@
 CPP       =g++
-CPPFLAGS   = -0s -arch i386
+CPPFLAGS   = -0s -force_cpusubtype_ALL -mmacosx-version-min=10.4 -arch i386 -arch ppc
 #CPPFLAGS += -g -O0
 #CPPFLAGS += -DDEBUG_ON
 #CPPFLAGS += -save-temps
