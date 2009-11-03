@@ -550,20 +550,26 @@ FUNCTION(Jill_run, ARG_FN(app))
 {
     int port = 8080;
     int backlog = 100;
+    in_addr_t host = INADDR_ANY;
     
     if (ARGC > 1 && IS_OBJECT(ARGV(1))) {
         NWObject options = TO_OBJECT(ARGV(1));
-        port = GET_INT(options, "port");
-        if (*_exception) {
-            JS_Print(*_exception);
-            *_exception = NULL;
+        if (HAS_PROPERTY(options, "port")) {
+            port = GET_INT(options, "port");
+            HANDLE_EXCEPTION(true, true);
+        }
+        if (HAS_PROPERTY(options, "host")) {
+            NWValue hostValue = GET_VALUE(options, "host");
+            HANDLE_EXCEPTION(true, true);
+            GET_UTF8(hostStr, hostValue);
+            host = inet_addr(hostStr);
         }
     }
     fprintf(stdout, "Jack is starting up using Jill on port %d\n", port);
     fflush(stdout);
 
     int server_socket, client_socket;
-    struct sockaddr_in server_address, client_address;
+    struct sockaddr_in server_address = {0}, client_address = {0};
     
     server_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (server_socket < 0)
@@ -574,7 +580,7 @@ FUNCTION(Jill_run, ARG_FN(app))
     setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
 
     server_address.sin_family = AF_INET;
-    server_address.sin_addr.s_addr = INADDR_ANY;
+    server_address.sin_addr.s_addr = host;
     server_address.sin_port = htons(port);
     
     if (bind(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)

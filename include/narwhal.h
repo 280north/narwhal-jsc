@@ -230,6 +230,14 @@ JSValueRef _GET_VALUE(JSContextRef _context, JSValueRef *_exception, JSObjectRef
 #define GET_BOOL(object, name) \
     JSValueToBoolean(_context, GET_VALUE(object, name))
 
+#define HAS_PROPERTY(object, property) _HAS_PROPERTY(_context, object, property)
+bool _HAS_PROPERTY(JSContextRef _context, JSObjectRef object, const char *property) {
+    JSStringRef propertyName = JSStringCreateWithUTF8CString(property);
+    bool has = JSObjectHasProperty(_context, object, propertyName);
+    JSStringRelease(propertyName);
+    return has;
+}
+
 #define EXPORTS(name, object) SET_VALUE(Exports, name, object);
 
 #define FUNC_HEADER(f) \
