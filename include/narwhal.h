@@ -11,6 +11,17 @@
 JSObjectRef JSObjectMakeDate(JSContextRef, size_t, const JSValueRef[], JSValueRef*);
 JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef, const char *);
 
+// You never know what sorts of CPUs we'll want to run Narwhal on...
+#if defined(__hppa__) || \
+    defined(__m68k__) || defined(mc68000) || defined(_M_M68K) || \
+    (defined(__MIPS__) && defined(__MISPEB__)) || \
+    defined(__ppc__) || defined(__POWERPC__) || defined(_M_PPC) || \
+    defined(__sparc__)
+	#define UTF_16_ENCODING "UTF-16BE"
+#else
+	#define UTF_16_ENCODING "UTF-16LE"
+#endif
+
 //#define DEBUG_ON
 #ifdef DEBUG_ON
 #define DEBUG(...) LOG(__VA_ARGS__)

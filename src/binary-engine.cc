@@ -226,7 +226,7 @@ FUNCTION(B_DECODE, ARG_OBJ(bytes), ARG_INT(offset), ARG_INT(srcLength), ARG_UTF8
     char *dst;
     size_t dstLength;
 
-    if (!transcode((char *)(src_data->buffer + offset), srcLength, &dst, &dstLength, codec, "UTF-16LE"))
+    if (!transcode((char *)(src_data->buffer + offset), srcLength, &dst, &dstLength, codec, UTF_16_ENCODING))
         THROW("B_DECODE: iconv error");
 
     NWString string = JS_str_utf16(dst, dstLength);
@@ -244,7 +244,7 @@ FUNCTION(B_ENCODE, ARG_STR(string), ARG_UTF8(codec))
     if (!GET_UTF16(string, &src, &srcLength))
         THROW("BLAHHHHH");
 
-    if (!transcode(src, srcLength, &dst, &dstLength, "UTF-16LE", codec))
+    if (!transcode(src, srcLength, &dst, &dstLength, UTF_16_ENCODING, codec))
         THROW("B_ENCODE: iconv error");
     
     free(src);

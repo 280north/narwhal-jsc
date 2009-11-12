@@ -174,7 +174,7 @@ CONSTRUCTOR(TextInputStream_constructor)
     SET_VALUE(object, "charset", charsetStr);
     
     GET_UTF8(charset, charsetStr);
-    data->cd = iconv_open("UTF-16LE", charset);
+    data->cd = iconv_open(UTF_16_ENCODING, charset);
     if (data->cd == (iconv_t)-1)
         THROW("Error TextInputStream (iconv_open)");
     
