@@ -37,7 +37,7 @@ jscocoa: frameworks-jscocoa jsc-jscocoa modules rewrite-lib-paths
 webkit: jsc-webkit modules rewrite-lib-paths
 
 lib/libnarwhal.dylib: narwhal.c
-	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(FRAMEWORKS) -framework JavaScriptCore 
+	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(FRAMEWORKS) -framework JavaScriptCore -lreadline 
 
 jsc: $(SOURCE) lib/libnarwhal.dylib
 	mkdir -p `dirname $(EXECUTABLE)`

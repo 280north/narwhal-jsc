@@ -1,12 +1,17 @@
 #ifndef __NARWHAL__
 #define __NARWHAL__
 
+#include <JavaScriptCore/JavaScriptCore.h>
+#include <dlfcn.h>
+#include <pthread.h>
+#include <readline/history.h>
+#include <readline/readline.h>
+#include <stdio.h>
+#include <sys/stat.h>
+
 // platform name
 #define NARWHAL_JSC
 #define NARWHAL_VERSION "0.2a"
-
-#include <JavaScriptCore/JavaScriptCore.h>
-#include <pthread.h>
 
 JSObjectRef JSObjectMakeDate(JSContextRef, size_t, const JSValueRef[], JSValueRef*);
 JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef, const char *);
@@ -423,5 +428,9 @@ JSValueRef _PROTECT(JSContextRef _context, JSValueRef value) {
 }
 
 #define PROTECT_OBJECT(value) ((NWObject)PROTECT(value))
+
+JSValueRef narwhal(JSGlobalContextRef _context, JSValueRef *_exception, int argc, char *argv[], char *envp[]);
+
+
 
 #endif
