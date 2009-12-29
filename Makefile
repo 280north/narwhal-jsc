@@ -16,7 +16,6 @@ MODULES   =$(patsubst %.cc,%.dylib,$(patsubst src/%,lib/%,$(shell find src -name
 LIBS      =-framework JavaScriptCore -L/usr/lib -lreadline -liconv -L$(LIB_DIR) -lnarwhal $(FRAMEWORKS)
 
 SOURCE    =narwhal-jsc.c
-EXECUTABLE=bin/narwhal-jsc
 
 JSCORE_CONFIG=Production
 JSCORE_FRAMEWORK=$(FRAMEWORKS_DIR)/JavaScriptCore.framework
@@ -141,7 +140,7 @@ $(JSCOCOA_CHECKOUT):
 
 clean:
 	find lib -name "*.dylib" -exec rm -rf {} \;
-	rm -rf bin/narwhal-jsc* bin/*.dylib bin/*.dSYM lib/*.dylib lib/*.dSYM $(EXECUTABLE) *.o *.ii *.s
+	rm -rf bin/narwhal-jscore* bin/narwhal-webkit* bin/*.dylib bin/*.dSYM lib/*.dylib lib/*.dSYM *.o *.ii *.s
 	cd deps/http-parser && make clean
 
 cleaner: clean
