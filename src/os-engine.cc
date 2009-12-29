@@ -1,4 +1,5 @@
 #include <narwhal.h>
+
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -199,9 +200,9 @@ NARWHAL_MODULE(os_engine)
     EXPORTS("systemImpl", JS_fn(OS_systemImpl));
     EXPORTS("popenImpl", JS_fn(OS_popenImpl));
     
-    require("os-engine.js");
+    NW_require("os-engine.js");
     
-    NWObject io = require("io");
+    NWObject io = NW_require("io");
     HANDLE_EXCEPTION(true, true);
     
     IO = PROTECT_OBJECT(GET_OBJECT(io, "IO"));

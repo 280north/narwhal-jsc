@@ -1,5 +1,6 @@
 CPP       =g++
-CPPFLAGS   = -0s -force_cpusubtype_ALL -mmacosx-version-min=10.4 -arch i386 -arch ppc
+CC        =gcc
+CPPFLAGS  = -0s -force_cpusubtype_ALL -mmacosx-version-min=10.4 -arch i386 -arch ppc
 #CPPFLAGS += -g -O0
 #CPPFLAGS += -DDEBUG_ON
 #CPPFLAGS += -save-temps
@@ -32,62 +33,89 @@ JSCOCOA_FRAMEWORK=$(FRAMEWORKS_DIR)/JSCocoa.framework
 JSCOCOA_BUILD=deps/JSCocoa/JSCocoa/build/Release/JSCocoa.framework
 JSCOCOA_CHECKOUT=deps/JSCocoa
 
-all: jsc modules rewrite-lib-paths
-jscocoa: frameworks-jscocoa jsc-jscocoa modules rewrite-lib-paths
-webkit: jsc-webkit modules rewrite-lib-paths
+all: webkit webkit-debug jscore
+	
+jscore: 		bin/narwhal-jscore modules config-jscore
+webkit: 		bin/narwhal-webkit modules config-webkit
+webkit-debug:	bin/narwhal-webkit-debug modules config-webkit-debug
+jscocoa: 		frameworks-jscocoa bin/narwhal-jscocoa modules config-jscocoa
+
 
 lib/libnarwhal.dylib: narwhal.c
-	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(FRAMEWORKS) -framework JavaScriptCore -lreadline 
+	$(CC) -o $@ $< -dynamiclib $(CPPFLAGS) $(INCLUDES) $(FRAMEWORKS) -framework JavaScriptCore -lreadline 
 
-jsc: $(SOURCE) lib/libnarwhal.dylib
-	mkdir -p `dirname $(EXECUTABLE)`
-	$(CPP) $(CPPFLAGS) $(INCLUDES) -o $(EXECUTABLE) $(SOURCE) $(LIBS)
-	install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$(EXECUTABLE)"
+bin/narwhal-jscore: $(SOURCE) lib/libnarwhal.dylib
+	mkdir -p `dirname $@`
+	$(CC) -o $@ $(SOURCE) $(CPPFLAGS) $(INCLUDES) $(LIBS)
+	install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$@"
 
-jsc-webkit: $(SOURCE) lib/libnarwhal.dylib
-	mkdir -p `dirname $(EXECUTABLE)`
-	$(CPP) $(CPPFLAGS) $(INCLUDES) -DWEBKIT -o $(EXECUTABLE) -x objective-c $(SOURCE) $(LIBS) \
-		-framework WebKit -framework Foundation -ObjC
-	install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$(EXECUTABLE)"
+bin/narwhal-webkit: $(SOURCE) lib/libnarwhal.dylib
+	mkdir -p `dirname $@`
+	$(CC) -o $@ -DWEBKIT -x objective-c $(SOURCE) $(CPPFLAGS) $(INCLUDES) $(LIBS) \
+		-framework Foundation -framework WebKit
+	install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$@"
 
-jsc-jscocoa: $(SOURCE) lib/libnarwhal.dylib
-	mkdir -p `dirname $(EXECUTABLE)`
-	$(CPP) $(CPPFLAGS) $(INCLUDES) -DJSCOCOA -o $(EXECUTABLE) -x objective-c $(SOURCE) $(LIBS) \
-		-framework JSCocoa -framework Foundation -ObjC
-	install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$(EXECUTABLE)"
+bin/narwhal-webkit-debug: $(SOURCE) NWDebug.m lib/libnarwhal.dylib
+	mkdir -p `dirname $@`
+	$(CC) -o $@ -DWEBKIT_DEBUG -x objective-c $(SOURCE) NWDebug.m $(CPPFLAGS) $(INCLUDES) $(LIBS) \
+		-framework Foundation -framework WebKit \
+		-framework AppKit -sectcreate __TEXT __info_plist Info.plist
+	install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$@"
 
-frameworks: $(JSCORE_FRAMEWORK)
+bin/narwhal-jscocoa: $(SOURCE) lib/libnarwhal.dylib
+	mkdir -p `dirname $@`
+	$(CC) -o $@ -DJSCOCOA -x objective-c $(SOURCE) $(CPPFLAGS) $(INCLUDES) $(LIBS) \
+		-framework Foundation -framework WebKit \
+		-framework JSCocoa
+	install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$@"
 
-frameworks-jscocoa: $(JSCORE_FRAMEWORK) $(JSCOCOA_FRAMEWORK)
 
-modules: $(MODULES)
+config-jscore:
+	echo 'export NARWHAL_JSC_MODE="jscore"' > narwhal-jsc.conf
+	# rm -f bin/narwhal-jsc
+	# ln -s narwhal-jscore bin/narwhal-jsc
+
+config-webkit:
+	echo 'export NARWHAL_JSC_MODE="webkit"' > narwhal-jsc.conf
+	# rm -f bin/narwhal-jsc
+	# ln -s narwhal-webkit bin/narwhal-jsc
+
+config-webkit-debug:
+	echo 'export NARWHAL_JSC_MODE="webkit-debug"' > narwhal-jsc.conf
+	# rm -f bin/narwhal-jsc
+	# ln -s narwhal-webkit-debug bin/narwhal-jsc
+
+config-jscocoa: 
+	echo 'export NARWHAL_JSC_MODE="jscocoa"' > narwhal-jsc.conf
+	# rm -f bin/narwhal-jsc
+	# ln -s narwhal-jscocoa bin/narwhal-jsc
+
+modules: $(MODULES) rewrite-lib-paths
 
 rewrite-lib-paths:
 	#find lib -name "*.dylib" \! -path "*.dSYM*" -exec install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" {} \;
 	find lib -name "*.dylib" \! -path "*.dSYM*" -exec install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" {} \;
-
-mongoose.o: mongoose.c
-	gcc $(CPPFLAGS) -W -Wall -std=c99 -pedantic -fomit-frame-pointer -c mongoose.c
-
-lib/jack/handler/mongoose.dylib: src/jack/handler/mongoose.cc mongoose.o
+	
+lib/%.dylib: src/%.cc
 	mkdir -p `dirname $@`
-	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(LIBS) mongoose.o
+	$(CPP) -o $@ $< $(CPPFLAGS) $(INCLUDES) -dynamiclib $(LIBS)
 	#install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" "$@"
+
+lib/jack/handler/jill.dylib: src/jack/handler/jill.cc deps/http-parser/http_parser.o lib/io-engine.dylib lib/binary-engine.dylib
+	mkdir -p `dirname $@`
+	$(CPP) -o $@ $< $(CPPFLAGS) $(INCLUDES) -dynamiclib $(LIBS) deps/http-parser/http_parser.o lib/io-engine.dylib lib/binary-engine.dylib
+	#install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" "$@"
+	install_name_tool -change "lib/io-engine.dylib" "@executable_path/../lib/io-engine.dylib" "$@"
+	install_name_tool -change "lib/binary-engine.dylib" "@executable_path/../lib/binary-engine.dylib" "$@"
 
 deps/http-parser/http_parser.o:
 	cd deps/http-parser && make http_parser.o
 
-lib/jack/handler/jill.dylib: src/jack/handler/jill.cc deps/http-parser/http_parser.o lib/io-engine.dylib lib/binary-engine.dylib
-	mkdir -p `dirname $@`
-	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(LIBS) deps/http-parser/http_parser.o lib/io-engine.dylib lib/binary-engine.dylib
-	#install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" "$@"
-	install_name_tool -change "lib/io-engine.dylib" "@executable_path/../lib/io-engine.dylib" "$@"
-	install_name_tool -change "lib/binary-engine.dylib" "@executable_path/../lib/binary-engine.dylib" "$@"
-	
-lib/%.dylib: src/%.cc
-	mkdir -p `dirname $@`
-	$(CPP) $(CPPFLAGS) $(INCLUDES) -dynamiclib -o $@ $< $(LIBS)
-	#install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" "$@"
+
+
+frameworks: $(JSCORE_FRAMEWORK)
+
+frameworks-jscocoa: $(JSCOCOA_FRAMEWORK)
 
 $(JSCORE_FRAMEWORK): $(JSCORE_BUILD)
 	mkdir -p `dirname $@`

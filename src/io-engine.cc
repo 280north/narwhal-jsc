@@ -421,6 +421,6 @@ NARWHAL_MODULE(io_engine)
     EXPORTS("STDOUT_FILENO", JS_int(STDOUT_FILENO));
     EXPORTS("STDERR_FILENO", JS_int(STDERR_FILENO));
     
-    require("io-engine.js");
+    NW_require("io-engine.js");
 }
 END_NARWHAL_MODULE

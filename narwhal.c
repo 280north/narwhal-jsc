@@ -164,8 +164,32 @@ JSObjectRef argvToArray(JSGlobalContextRef _context, JSValueRef *_exception, int
     return ARGS;
 }
 
+void* EvaluateREPL(JSContextRef _context, JSStringRef source)
+{
+    static JSStringRef replTag;
+    if (!replTag)
+        replTag = JSStringCreateWithUTF8CString("<repl>");
+    
+    JSValueRef exception = NULL;
+    JSValueRef *_exception = &exception;
+    if (JSCheckScriptSyntax(_context, source, 0, 0, _exception) && !(*_exception))
+    {
+        JSValueRef value = JSEvaluateScript(_context, source, 0, replTag, 0, _exception);
+        HANDLE_EXCEPTION(true, false);
+        
+        if (value && !JSValueIsUndefined(_context, value)) {
+            JS_Print(value);
+            HANDLE_EXCEPTION(true, false);
+        }
+    }
+    else
+    {
+        HANDLE_EXCEPTION(true, false);
+    }
+}
+
 // The read-eval-execute loop of the shell.
-void* RunShell(JSContextRef _context) {
+void* RunREPL(JSContextRef _context) {
     printf("Narwhal version %s, JavaScriptCore engine\n", NARWHAL_VERSION);
     while (true)
     {
@@ -184,22 +208,7 @@ void* RunShell(JSContextRef _context) {
         
         LOCK();
         
-        JSValueRef exception = NULL;
-        JSValueRef *_exception = &exception;
-        if (JSCheckScriptSyntax(_context, source, 0, 0, _exception) && !(*_exception))
-        {
-            JSValueRef value = JSEvaluateScript(_context, source, 0, 0, 0, _exception);
-            HANDLE_EXCEPTION(true, false);
-            
-            if (value && !JSValueIsUndefined(_context, value)) {
-                JS_Print(value);
-                HANDLE_EXCEPTION(true, false);
-            }
-        }
-        else
-        {
-            HANDLE_EXCEPTION(true, false);
-        }
+        EvaluateREPL(_context, source);
         
         JSStringRelease(source);
         
@@ -212,7 +221,7 @@ void* RunShell(JSContextRef _context) {
     printf("\n");
 }
 
-JSValueRef narwhal(JSGlobalContextRef _context, JSValueRef *_exception, int argc, char *argv[], char *envp[])
+JSValueRef narwhal_wrapped(JSGlobalContextRef _context, JSValueRef *_exception, int argc, char *argv[], char *envp[], int runShell)
 {
     pthread_mutex_t	_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -220,6 +229,54 @@ JSValueRef narwhal(JSGlobalContextRef _context, JSValueRef *_exception, int argc
     narwhal_context.mutex = &_mutex;
     
     LOCK();
+    
+    // TODO: cleanup all this. strcpy, sprintf, etc BAD!
+    char executable[1024];
+    char buffer[1024];
+    
+    // start with the executable name from argv[0]
+    strcpy(executable, argv[0]);
+    
+    // follow any symlinks
+    size_t len;
+    while ((int)(len = readlink(executable, buffer, sizeof(buffer))) >= 0) {
+        buffer[len] = '\0';
+        // make relative to symlink's directory
+        if (buffer[0] != '/') {
+            char tmp[1024];
+            strcpy(tmp, buffer);
+            sprintf(buffer, "%s/%s", (char *)dirname(executable), tmp);
+        }
+        strcpy(executable, buffer);
+    }
+    
+    // make absolute
+    if (executable[0] != '/') {
+        char tmp[1024], tmp2[1024];
+        getcwd(tmp, sizeof(tmp));
+        sprintf(buffer, "%s/%s", tmp, executable);
+        strcpy(executable, buffer);
+    }
+    
+    char NARWHAL_HOME[1024], NARWHAL_ENGINE_HOME[1024];
+
+    // try getting NARWHAL_ENGINE_HOME from env variable. fall back to 2nd ancestor of executable path
+    if (getenv("NARWHAL_ENGINE_HOME"))
+        strcpy(NARWHAL_ENGINE_HOME, getenv("NARWHAL_ENGINE_HOME"));
+    else
+        strcpy(NARWHAL_ENGINE_HOME, (char *)dirname((char *)dirname(executable)));
+
+    // try getting NARWHAL_HOME from env variable. fall back to 2nd ancestor of NARWHAL_ENGINE_HOME
+    if (getenv("NARWHAL_HOME"))
+        strcpy(NARWHAL_HOME, getenv("NARWHAL_HOME"));
+    else
+        strcpy(NARWHAL_HOME, (char *)dirname((char *)dirname(NARWHAL_ENGINE_HOME)));
+
+    JSObjectRef ARGS = CALL(argvToArray, argc, argv);
+    JSObjectRef ENV = CALL(envpToObject, envp);
+    
+    SET_VALUE(ENV, "NARWHAL_HOME",        JS_str_utf8(NARWHAL_HOME, strlen(NARWHAL_HOME)));
+    SET_VALUE(ENV, "NARWHAL_ENGINE_HOME", JS_str_utf8(NARWHAL_ENGINE_HOME, strlen(NARWHAL_ENGINE_HOME)));
 
     JSObjectRef global = JS_GLOBAL;
 
@@ -227,11 +284,10 @@ JSValueRef narwhal(JSGlobalContextRef _context, JSValueRef *_exception, int argc
     SET_VALUE(global, "isFile",         JS_fn(NW_isFile));
     SET_VALUE(global, "read",           JS_fn(NW_read));
     SET_VALUE(global, "requireNative",  JS_fn(NW_requireNative));
-    SET_VALUE(global, "ARGS",           CALL(argvToArray, argc, argv));
-    SET_VALUE(global, "ENV",            CALL(envpToObject, envp));
+    SET_VALUE(global, "ARGS",           ARGS);
+    SET_VALUE(global, "ENV",            ENV);
     
     // Load bootstrap.js
-    char *NARWHAL_ENGINE_HOME = getenv("NARWHAL_ENGINE_HOME");
     char *bootstrapPathRelative = "/bootstrap.js";
     char bootstrapPathFull[strlen(NARWHAL_ENGINE_HOME) + strlen(bootstrapPathRelative) + 1];
     snprintf(bootstrapPathFull, sizeof(bootstrapPathFull), "%s%s", NARWHAL_ENGINE_HOME, bootstrapPathRelative);
@@ -241,11 +297,27 @@ JSValueRef narwhal(JSGlobalContextRef _context, JSValueRef *_exception, int argc
         THROW("Error reading bootstrap.js\n");
     }
     
-    JSEvaluateScript(_context, bootstrapSource, 0, 0, 0, _exception);
+    JSStringRef bootstrapTag = JSStringCreateWithUTF8CString(bootstrapPathFull);
+    
+    JSEvaluateScript(_context, bootstrapSource, 0, bootstrapTag, 0, _exception);
+    if (*_exception) {
+        JS_Print(*_exception);
+    }
+    
     JSStringRelease(bootstrapSource);
+    JSStringRelease(bootstrapTag);
     
     UNLOCK();
     
-    if (!*_exception && argc <= 1)
-        RunShell(_context);
+    if (!*_exception && argc <= 1 && runShell)
+        RunREPL(_context);
+
+}
+
+int narwhal(JSGlobalContextRef _context, JSValueRef *_exception, int argc, char *argv[], char *envp[], int runShell)
+{
+    narwhal_wrapped(_context, _exception, argc, argv, envp, runShell);
+    if (*_exception)
+        return 1;
+    return 0;
 }

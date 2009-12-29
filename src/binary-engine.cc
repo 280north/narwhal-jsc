@@ -1,4 +1,5 @@
 #include <narwhal.h>
+
 #include <stdlib.h>
 #include <string.h>
 #include <iconv.h>
@@ -65,7 +66,7 @@ END
 
 #endif
 
-FUNCTION(B_ALLOC, ARG_INT(length))
+FUNCTION(BINARY_B_ALLOC, ARG_INT(length))
 {
     char *buffer = (char*)calloc(length, sizeof(char));
     if (!buffer)
@@ -75,14 +76,14 @@ FUNCTION(B_ALLOC, ARG_INT(length))
 }
 END
 
-FUNCTION(B_LENGTH, ARG_OBJ(bytes))
+FUNCTION(BINARY_B_LENGTH, ARG_OBJ(bytes))
 {
     GET_INTERNAL(BytesPrivate*, byte_data, bytes);
     return JS_int(byte_data->length);
 }
 END
 
-FUNCTION(B_FILL, ARG_OBJ(bytes), ARG_INT(from), ARG_INT(to), ARG_INT(value))
+FUNCTION(BINARY_B_FILL, ARG_OBJ(bytes), ARG_INT(from), ARG_INT(to), ARG_INT(value))
 {
     GET_INTERNAL(BytesPrivate*, byte_data, bytes);
 
@@ -98,7 +99,7 @@ FUNCTION(B_FILL, ARG_OBJ(bytes), ARG_INT(from), ARG_INT(to), ARG_INT(value))
 }
 END
 
-FUNCTION(B_COPY, ARG_OBJ(src), ARG_INT(srcOffset), ARG_OBJ(dst), ARG_INT(dstOffset), ARG_INT(length))
+FUNCTION(BINARY_B_COPY, ARG_OBJ(src), ARG_INT(srcOffset), ARG_OBJ(dst), ARG_INT(dstOffset), ARG_INT(length))
 {
     GET_INTERNAL(BytesPrivate*, src_data, src);
     GET_INTERNAL(BytesPrivate*, dst_data, dst);
@@ -112,7 +113,7 @@ FUNCTION(B_COPY, ARG_OBJ(src), ARG_INT(srcOffset), ARG_OBJ(dst), ARG_INT(dstOffs
 }
 END
 
-FUNCTION(B_GET, ARG_OBJ(bytes), ARG_INT(index))
+FUNCTION(BINARY_B_GET, ARG_OBJ(bytes), ARG_INT(index))
 {
     GET_INTERNAL(BytesPrivate*, bytes_data, bytes);
 
@@ -125,7 +126,7 @@ FUNCTION(B_GET, ARG_OBJ(bytes), ARG_INT(index))
 }
 END
 
-FUNCTION(B_SET, ARG_OBJ(bytes), ARG_INT(index), ARG_INT(value))
+FUNCTION(BINARY_B_SET, ARG_OBJ(bytes), ARG_INT(index), ARG_INT(value))
 {
     GET_INTERNAL(BytesPrivate*, bytes_data, bytes);
 
@@ -140,14 +141,14 @@ FUNCTION(B_SET, ARG_OBJ(bytes), ARG_INT(index), ARG_INT(value))
 }
 END
 
-FUNCTION(B_DECODE_DEFAULT, ARG_OBJ(bytes), ARG_INT(offset), ARG_INT(length))
+FUNCTION(BINARY_B_DECODE_DEFAULT, ARG_OBJ(bytes), ARG_INT(offset), ARG_INT(length))
 {
     GET_INTERNAL(BytesPrivate*, bytes_data, bytes);
     return JS_str_utf8((char *)(bytes_data->buffer + offset), length);
 }
 END
 
-FUNCTION(B_ENCODE_DEFAULT, ARG_UTF8(string))
+FUNCTION(BINARY_B_ENCODE_DEFAULT, ARG_UTF8(string))
 {
     int length = strlen(string);
 
@@ -219,7 +220,7 @@ int transcode(char *src, size_t srcLength, char **dstOut, size_t *dstLengthOut, 
     return 1;
 }
 
-FUNCTION(B_DECODE, ARG_OBJ(bytes), ARG_INT(offset), ARG_INT(srcLength), ARG_UTF8(codec))
+FUNCTION(BINARY_B_DECODE, ARG_OBJ(bytes), ARG_INT(offset), ARG_INT(srcLength), ARG_UTF8(codec))
 {
     GET_INTERNAL(BytesPrivate*, src_data, bytes);
 
@@ -236,13 +237,13 @@ FUNCTION(B_DECODE, ARG_OBJ(bytes), ARG_INT(offset), ARG_INT(srcLength), ARG_UTF8
 }
 END
 
-FUNCTION(B_ENCODE, ARG_STR(string), ARG_UTF8(codec))
+FUNCTION(BINARY_B_ENCODE, ARG_STR(string), ARG_UTF8(codec))
 {
     char *src, *dst;
     size_t srcLength, dstLength;
     
     if (!GET_UTF16(string, &src, &srcLength))
-        THROW("BLAHHHHH");
+        THROW("B_ENCODE: GET_UTF16 error");
 
     if (!transcode(src, srcLength, &dst, &dstLength, UTF_16_ENCODING, codec))
         THROW("B_ENCODE: iconv error");
@@ -253,7 +254,7 @@ FUNCTION(B_ENCODE, ARG_STR(string), ARG_UTF8(codec))
 }
 END
 
-FUNCTION(B_TRANSCODE, ARG_OBJ(srcBytes), ARG_INT(srcOffset), ARG_INT(srcLength), ARG_UTF8(srcCodec), ARG_UTF8(dstCodec))
+FUNCTION(BINARY_B_TRANSCODE, ARG_OBJ(srcBytes), ARG_INT(srcOffset), ARG_INT(srcLength), ARG_UTF8(srcCodec), ARG_UTF8(dstCodec))
 {
     GET_INTERNAL(BytesPrivate*, src_data, srcBytes);
 
@@ -270,20 +271,20 @@ END
 
 NARWHAL_MODULE(binary_engine)
 {
-    EXPORTS("B_LENGTH", JS_fn(B_LENGTH));
-    EXPORTS("B_ALLOC", JS_fn(B_ALLOC));
-    EXPORTS("B_FILL", JS_fn(B_FILL));
-    EXPORTS("B_COPY", JS_fn(B_COPY));
-    EXPORTS("B_GET", JS_fn(B_GET));
-    EXPORTS("B_SET", JS_fn(B_SET));
-
-    EXPORTS("B_DECODE", JS_fn(B_DECODE));
-    EXPORTS("B_ENCODE", JS_fn(B_ENCODE));
-
-    EXPORTS("B_DECODE_DEFAULT", JS_fn(B_DECODE_DEFAULT));
-    EXPORTS("B_ENCODE_DEFAULT", JS_fn(B_ENCODE_DEFAULT));
-
-    EXPORTS("B_TRANSCODE", JS_fn(B_TRANSCODE));
+    EXPORTS("B_LENGTH", JS_fn(BINARY_B_LENGTH));
+    EXPORTS("B_ALLOC", JS_fn(BINARY_B_ALLOC));
+    EXPORTS("B_FILL", JS_fn(BINARY_B_FILL));
+    EXPORTS("B_COPY", JS_fn(BINARY_B_COPY));
+    EXPORTS("B_GET", JS_fn(BINARY_B_GET));
+    EXPORTS("B_SET", JS_fn(BINARY_B_SET));
+             
+    EXPORTS("B_DECODE", JS_fn(BINARY_B_DECODE));
+    EXPORTS("B_ENCODE", JS_fn(BINARY_B_ENCODE));
+             
+    EXPORTS("B_DECODE_DEFAULT", JS_fn(BINARY_B_DECODE_DEFAULT));
+    EXPORTS("B_ENCODE_DEFAULT", JS_fn(BINARY_B_ENCODE_DEFAULT));
+             
+    EXPORTS("B_TRANSCODE", JS_fn(BINARY_B_TRANSCODE));
 
     EXPORTS("DEFAULT_CODEC", JS_str_utf8("UTF-8", strlen("UTF-8")));
 }
