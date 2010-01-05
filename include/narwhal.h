@@ -1,12 +1,17 @@
 #ifndef __NARWHAL__
 #define __NARWHAL__
 
+#include <JavaScriptCore/JavaScriptCore.h>
+#include <dlfcn.h>
+#include <pthread.h>
+#include <readline/history.h>
+#include <readline/readline.h>
+#include <stdio.h>
+#include <sys/stat.h>
+
 // platform name
 #define NARWHAL_JSC
 #define NARWHAL_VERSION "0.2a"
-
-#include <JavaScriptCore/JavaScriptCore.h>
-#include <pthread.h>
 
 JSObjectRef JSObjectMakeDate(JSContextRef, size_t, const JSValueRef[], JSValueRef*);
 JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef, const char *);
@@ -54,7 +59,7 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef, const char *);
 
 #define HANDLE_EXCEPTION(shouldPrint, shouldReturn) \
     HANDLE_EXCEPTION_BLOCK({ \
-        if (shouldPrint) {fprintf(stderr, "ERROR:" THROW_DEBUG, __FILE__, __LINE__); JS_Print(*_exception);} \
+        if (shouldPrint) {fprintf(stderr, "" THROW_DEBUG, __FILE__, __LINE__); JS_Print(*_exception);} \
         if (shouldReturn) return NULL; \
     })
 
@@ -205,8 +210,17 @@ JSValueRef _TO_STRING(JSContextRef _context, JSValueRef *_exception, JSValueRef 
 #define JS_str_utf16(str, len) JSValueMakeStringWithUTF16(_context, (JSChar*)str, (len)/sizeof(JSChar))
 
 //#define JS_obj(value)   JSValueToObject(_context, value, _exception)
-#define JS_fn(f)        JSObjectMakeFunctionWithCallback(_context, NULL, f)
-#define JS_array(count, array) JSObjectMakeArray(_context, count, array, _exception)
+
+#define JS_fn(f) _JS_fn(_context, STRINGIZE(f), f)
+JSObjectRef _JS_fn(JSContextRef _context, const char *name, JSObjectCallAsFunctionCallback f)
+{
+    JSStringRef nameStr = JSStringCreateWithUTF8CString(name);
+    JSObjectRef value = JSObjectMakeFunctionWithCallback(_context, nameStr, f);
+    JSStringRelease(nameStr);
+    return value;
+}
+
+#define JS_array(count, array)  JSObjectMakeArray(_context, count, array, _exception)
 
 #define JS_date(ms) _JS_date(_context, _exception, ms)
 NWValue _JS_date(JSContextRef _context, JSValueRef* _exception, long long usec) {
@@ -249,7 +263,7 @@ bool _HAS_PROPERTY(JSContextRef _context, JSObjectRef object, const char *proper
     return has;
 }
 
-#define EXPORTS(name, object) SET_VALUE(Exports, name, object);
+#define EXPORTS(name, object) SET_VALUE(NW_Exports, name, object);
 
 #define FUNC_HEADER(f) \
     JSValueRef f( \
@@ -288,22 +302,22 @@ bool _HAS_PROPERTY(JSContextRef _context, JSObjectRef object, const char *proper
     }
 
 #define NARWHAL_MODULE(MODULE_NAME) \
-    JSObjectRef Require; \
-    JSObjectRef Exports; \
-    JSObjectRef Module; \
-    JSObjectRef System; \
-    JSObjectRef Print; \
+    JSObjectRef NW_Require; \
+    JSObjectRef NW_Exports; \
+    JSObjectRef NW_Module; \
+    JSObjectRef NW_System; \
+    JSObjectRef NW_Print; \
     JSContextRef _context; \
     NarwhalContext narwhal_context; \
     \
     void print(const char * string)\
     {\
         JSValueRef argv[] = { JS_str_utf8(string, strlen(string)) }; \
-        JSObjectCallAsFunction(_context, Print, NULL, 1, argv, NULL); \
+        JSObjectCallAsFunction(_context, NW_Print, NULL, 1, argv, NULL); \
     }\
-    JSObjectRef require(const char *id) {\
+    JSObjectRef NW_require(const char *id) {\
         JSValueRef argv[] = { JS_str_utf8(id, strlen(id)) }; \
-        return JSValueToObject(_context, JSObjectCallAsFunction(_context, Require, NULL, 1, argv, NULL), NULL); \
+        return JSValueToObject(_context, JSObjectCallAsFunction(_context, NW_Require, NULL, 1, argv, NULL), NULL); \
     }\
     \
     const char *moduleName = STRINGIZE(MODULE_NAME);\
@@ -315,18 +329,18 @@ bool _HAS_PROPERTY(JSContextRef _context, JSObjectRef object, const char *proper
     extern "C" FUNC_HEADER(MODULE_NAME) \
         { _context = _ctx; \
         ARG_COUNT(5); \
-        Require = JSValueToObject(_context, ARGV(0), _exception); \
+        NW_Require = JSValueToObject(_context, ARGV(0), _exception); \
         if (*_exception) { return NULL; }; \
-        if (!JSObjectIsFunction(_context, Require)) { THROW("Argument 0 must be a function."); } \
-        Exports = JSValueToObject(_context, ARGV(1), _exception); \
+        if (!JSObjectIsFunction(_context, NW_Require)) { THROW("Argument 0 must be a function."); } \
+        NW_Exports = JSValueToObject(_context, ARGV(1), _exception); \
         if (*_exception) { return NULL; }; \
-        Module = JSValueToObject(_context, ARGV(2), _exception); \
+        NW_Module = JSValueToObject(_context, ARGV(2), _exception); \
         if (*_exception) { return NULL; }; \
-        System = JSValueToObject(_context, ARGV(3), _exception); \
+        NW_System = JSValueToObject(_context, ARGV(3), _exception); \
         if (*_exception) { return NULL; }; \
-        Print = JSValueToObject(_context, ARGV(4), _exception); \
+        NW_Print = JSValueToObject(_context, ARGV(4), _exception); \
         if (*_exception) { return NULL; }; \
-        if (!JSObjectIsFunction(_context, Print)) { THROW("Argument 4 must be a function."); } \
+        if (!JSObjectIsFunction(_context, NW_Print)) { THROW("Argument 4 must be a function."); } \
 
 #define END_NARWHAL_MODULE \
     return JS_undefined; }\
@@ -399,15 +413,15 @@ JSClassRef Custom_class(JSContextRef _context)
     return jsClass;
 }
 
-extern JSObjectRef Require;
-extern JSObjectRef Exports;
-extern JSObjectRef Module;
-extern JSObjectRef System;
-extern JSObjectRef Print;
+extern JSObjectRef NW_Require;
+extern JSObjectRef NW_Exports;
+extern JSObjectRef NW_Module;
+extern JSObjectRef NW_System;
+extern JSObjectRef NW_Print;
 extern JSContextRef _context;
 extern NarwhalContext narwhal_context;
 extern void print(const char * string);
-extern JSObjectRef require(const char *id);
+extern JSObjectRef NW_require(const char *id);
 
 JSObjectRef JSObjectMakeArray(JSContextRef _context, size_t argc, const JSValueRef argv[],  JSValueRef* _exception);
 JSObjectRef JSObjectMakeDate(JSContextRef _context, size_t argc, const JSValueRef argv[],  JSValueRef* _exception);
@@ -423,5 +437,10 @@ JSValueRef _PROTECT(JSContextRef _context, JSValueRef value) {
 }
 
 #define PROTECT_OBJECT(value) ((NWObject)PROTECT(value))
+
+int narwhal(JSGlobalContextRef _context, JSValueRef *_exception, int argc, char *argv[], char *envp[], int runShell);
+
+void* EvaluateREPL(JSContextRef _context, JSStringRef source);
+
 
 #endif

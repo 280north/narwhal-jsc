@@ -211,6 +211,7 @@ FUNCTION(TextInputStream_read)
     size_t outBufferUsed = 0;
     char *outBuffer = (char*)malloc(outBufferSize);
     
+    int last_errno = 0;
     while (true) {
         // if the outBuffer is completely filled, double it's size
         if (outBufferUsed >= outBufferSize) {
@@ -224,18 +225,16 @@ FUNCTION(TextInputStream_read)
             outBuffer = (char*)realloc(outBuffer, outBufferSize);
         }
         
-        // if there's no data in the buffer read some more
-        if (d->inBufferUsed == 0) {
-            DEBUG("nothing in inBuffer, reading more\n");
+        // if there's no data in the buffer, or it ends in the middle of a multibyte character, read more
+        if (d->inBufferUsed == 0 || last_errno == EINVAL) {
+            DEBUG("need more data, reading\n");
             size_t num = read(fd, d->inBuffer + d->inBufferUsed, d->inBufferSize - d->inBufferUsed);
-            if (num >= 0)
+            if (num <= 0) {
+                DEBUG("couldn't read more, done reading for now\n");
+                break;
+            } else {
                 d->inBufferUsed += num;
-        }
-        
-        // still no data to read, so stop
-        if (d->inBufferUsed == 0) {
-            DEBUG("still nothing in inBuffer, done reading for now\n");
-            break;
+            }
         }
         
         char *in = d->inBuffer;
@@ -243,8 +242,12 @@ FUNCTION(TextInputStream_read)
         char *out = outBuffer + outBufferUsed;
         size_t outLeft = outBufferSize - outBufferUsed;
         
+        last_errno = 0;
         size_t ret = iconv(cd, &in, &inLeft, &out, &outLeft);
         if (ret != (size_t)-1 || errno == EINVAL || errno == E2BIG) {
+            if (ret == (size_t)-1)
+                last_errno = errno;
+            
             if (inLeft) {
                 DEBUG("shifting %d bytes down by %d (had %d)\n", inLeft, in - d->inBuffer, d->inBufferUsed);
                 memmove(d->inBuffer, in, inLeft);
@@ -418,6 +421,6 @@ NARWHAL_MODULE(io_engine)
     EXPORTS("STDOUT_FILENO", JS_int(STDOUT_FILENO));
     EXPORTS("STDERR_FILENO", JS_int(STDERR_FILENO));
     
-    require("io-engine.js");
+    NW_require("io-engine.js");
 }
 END_NARWHAL_MODULE

@@ -14,7 +14,7 @@
 
 NWObject io;
 
-FUNCTION(F_cwd)
+FUNCTION(FILE_cwd)
 {
     ARG_COUNT(0);
     
@@ -29,7 +29,7 @@ FUNCTION(F_cwd)
 }
 END
 
-FUNCTION(F_canonicalImpl, ARG_UTF8_CAST(path))
+FUNCTION(FILE_canonicalImpl, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
     
@@ -44,7 +44,7 @@ FUNCTION(F_canonicalImpl, ARG_UTF8_CAST(path))
 }
 END
 
-FUNCTION(F_mtime, ARG_UTF8_CAST(path))
+FUNCTION(FILE_mtime, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
     
@@ -59,7 +59,7 @@ FUNCTION(F_mtime, ARG_UTF8_CAST(path))
 }
 END
 
-FUNCTION(F_size, ARG_UTF8_CAST(path))
+FUNCTION(FILE_size, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
     
@@ -70,7 +70,7 @@ FUNCTION(F_size, ARG_UTF8_CAST(path))
 }
 END
 
-FUNCTION(F_stat, ARG_UTF8_CAST(path))
+FUNCTION(FILE_stat, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
 
@@ -81,7 +81,7 @@ FUNCTION(F_stat, ARG_UTF8_CAST(path))
 }
 END
 
-FUNCTION(F_exists, ARG_UTF8_CAST(path))
+FUNCTION(FILE_exists, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
 
@@ -92,7 +92,7 @@ FUNCTION(F_exists, ARG_UTF8_CAST(path))
 }
 END
 
-FUNCTION(F_linkExists, ARG_UTF8_CAST(path))
+FUNCTION(FILE_linkExists, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
 
@@ -103,7 +103,7 @@ FUNCTION(F_linkExists, ARG_UTF8_CAST(path))
 }
 END
 
-FUNCTION(F_isDirectory, ARG_UTF8_CAST(path))
+FUNCTION(FILE_isDirectory, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
 
@@ -114,7 +114,7 @@ FUNCTION(F_isDirectory, ARG_UTF8_CAST(path))
 }
 END
     
-FUNCTION(F_isFile, ARG_UTF8_CAST(path))
+FUNCTION(FILE_isFile, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
 
@@ -125,7 +125,7 @@ FUNCTION(F_isFile, ARG_UTF8_CAST(path))
 }
 END
 
-FUNCTION(F_isLink, ARG_UTF8_CAST(path))
+FUNCTION(FILE_isLink, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
 
@@ -136,7 +136,7 @@ FUNCTION(F_isLink, ARG_UTF8_CAST(path))
 }
 END
 
-FUNCTION(F_isReadable, ARG_UTF8_CAST(path))
+FUNCTION(FILE_isReadable, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
     
@@ -144,7 +144,7 @@ FUNCTION(F_isReadable, ARG_UTF8_CAST(path))
 }
 END
 
-FUNCTION(F_isWritable, ARG_UTF8_CAST(path))
+FUNCTION(FILE_isWritable, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
     
@@ -152,7 +152,7 @@ FUNCTION(F_isWritable, ARG_UTF8_CAST(path))
 }
 END
 
-FUNCTION(F_chmod, ARG_UTF8_CAST(path), ARG_INT(mode))
+FUNCTION(FILE_chmod, ARG_UTF8_CAST(path), ARG_INT(mode))
 {
     ARG_COUNT(2);
     
@@ -163,7 +163,7 @@ FUNCTION(F_chmod, ARG_UTF8_CAST(path), ARG_INT(mode))
 }
 END
 
-FUNCTION(F_chown, ARG_UTF8_CAST(path), ARG_UTF8_CAST(owner), ARG_UTF8_CAST(group))
+FUNCTION(FILE_chown, ARG_UTF8_CAST(path), ARG_UTF8_CAST(owner), ARG_UTF8_CAST(group))
 {
     ARG_COUNT(3);
     
@@ -173,7 +173,7 @@ FUNCTION(F_chown, ARG_UTF8_CAST(path), ARG_UTF8_CAST(owner), ARG_UTF8_CAST(group
 }
 END
 
-FUNCTION(F_link, ARG_UTF8_CAST(source), ARG_UTF8_CAST(target))
+FUNCTION(FILE_link, ARG_UTF8_CAST(source), ARG_UTF8_CAST(target))
 {
     ARG_COUNT(1);
     
@@ -183,7 +183,7 @@ FUNCTION(F_link, ARG_UTF8_CAST(source), ARG_UTF8_CAST(target))
 }
 END
 
-FUNCTION(F_symlink, ARG_UTF8_CAST(source), ARG_UTF8_CAST(target))
+FUNCTION(FILE_symlink, ARG_UTF8_CAST(source), ARG_UTF8_CAST(target))
 {
     ARG_COUNT(2);
     
@@ -194,7 +194,7 @@ FUNCTION(F_symlink, ARG_UTF8_CAST(source), ARG_UTF8_CAST(target))
 }
 END
 
-FUNCTION(F_renameImpl, ARG_UTF8_CAST(source), ARG_UTF8_CAST(target))
+FUNCTION(FILE_renameImpl, ARG_UTF8_CAST(source), ARG_UTF8_CAST(target))
 {
     ARG_COUNT(2);
 
@@ -205,7 +205,7 @@ FUNCTION(F_renameImpl, ARG_UTF8_CAST(source), ARG_UTF8_CAST(target))
 }
 END
 
-//FUNCTION(F_move, ARG_UTF8_CAST(source), ARG_UTF8_CAST(target))
+//FUNCTION(FILE_move, ARG_UTF8_CAST(source), ARG_UTF8_CAST(target))
 //{
 //    ARG_COUNT(2);
 //
@@ -215,7 +215,7 @@ END
 //}
 //END
     
-FUNCTION(F_remove, ARG_UTF8_CAST(path))
+FUNCTION(FILE_remove, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
     
@@ -226,7 +226,7 @@ FUNCTION(F_remove, ARG_UTF8_CAST(path))
 }
 END
 
-FUNCTION(F_mkdir, ARG_UTF8_CAST(path))
+FUNCTION(FILE_mkdir, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
     
@@ -239,7 +239,7 @@ FUNCTION(F_mkdir, ARG_UTF8_CAST(path))
 }
 END
 
-//FUNCTION(F_mkdirs, ARG_UTF8_CAST(path))
+//FUNCTION(FILE_mkdirs, ARG_UTF8_CAST(path))
 //{
 //    ARG_COUNT(1);
 //
@@ -249,7 +249,7 @@ END
 //}
 //END
 
-FUNCTION(F_rmdir, ARG_UTF8_CAST(path))
+FUNCTION(FILE_rmdir, ARG_UTF8_CAST(path))
 {
     ARG_COUNT(1);
 
@@ -260,7 +260,7 @@ FUNCTION(F_rmdir, ARG_UTF8_CAST(path))
 }
 END
     
-FUNCTION(F_list, ARG_UTF8_CAST(path))
+FUNCTION(FILE_list, ARG_UTF8_CAST(path))
 {
     DIR *dp;
     struct dirent *dirp;
@@ -282,7 +282,7 @@ FUNCTION(F_list, ARG_UTF8_CAST(path))
 }
 END
 
-FUNCTION(F_touchImpl, ARG_UTF8_CAST(path), ARG_DOUBLE(mtime))
+FUNCTION(FILE_touchImpl, ARG_UTF8_CAST(path), ARG_DOUBLE(mtime))
 {
     ARG_COUNT(2);
 
@@ -297,10 +297,10 @@ FUNCTION(F_touchImpl, ARG_UTF8_CAST(path), ARG_DOUBLE(mtime))
 }
 END
 
-FUNCTION(F_FileIO, ARG_UTF8_CAST(path))
+FUNCTION(FILE_FileIO, ARG_UTF8_CAST(path))
 {
     NWObject IO = GET_OBJECT(io, "IO");
-    NWObject mode_fn = GET_OBJECT(Exports, "mode");
+    NWObject mode_fn = GET_OBJECT(NW_Exports, "mode");
     
     ARGS_ARRAY(argv, ARGV(1));
     NWObject modeObject = TO_OBJECT(CALL_AS_FUNCTION(mode_fn, JS_GLOBAL, 1, argv));
@@ -360,42 +360,42 @@ END
 
 NARWHAL_MODULE(file_engine)
 {
-    Exports = PROTECT_OBJECT(require("./file"));
-    io = PROTECT_OBJECT(require("io"));
+    NW_Exports = PROTECT_OBJECT(NW_require("./file"));
+    io = PROTECT_OBJECT(NW_require("io"));
     
-    EXPORTS("FileIO", JS_fn(F_FileIO));
+    EXPORTS("FileIO", JS_fn(FILE_FileIO));
     
-    EXPORTS("cwd", JS_fn(F_cwd));
-    //EXPORTS("canonical", JS_fn(F_canonical));
-    EXPORTS("canonicalImpl", JS_fn(F_canonicalImpl));
-    EXPORTS("mtime", JS_fn(F_mtime));
-    EXPORTS("size", JS_fn(F_size));
-    EXPORTS("stat", JS_fn(F_stat));
-    EXPORTS("exists", JS_fn(F_exists));
-    EXPORTS("linkExists", JS_fn(F_linkExists));
-    EXPORTS("isDirectory", JS_fn(F_isDirectory));
-    EXPORTS("isFile", JS_fn(F_isFile));
-    EXPORTS("isLink", JS_fn(F_isLink));
-    EXPORTS("isReadable", JS_fn(F_isReadable));
-    EXPORTS("isWritable", JS_fn(F_isWritable));
-    EXPORTS("chmod", JS_fn(F_chmod));
-    EXPORTS("chown", JS_fn(F_chown));
-    EXPORTS("link", JS_fn(F_link));
-    EXPORTS("symlink", JS_fn(F_symlink));
-    //EXPORTS("rename", JS_fn(F_rename));
-    //EXPORTS("move", JS_fn(F_rename));
-    EXPORTS("renameImpl", JS_fn(F_renameImpl));
-    //EXPORTS("move", JS_fn(F_move));
-    EXPORTS("remove", JS_fn(F_remove));
-    EXPORTS("mkdir", JS_fn(F_mkdir));
-    //EXPORTS("mkdirs", JS_fn(F_mkdirs));
-    EXPORTS("rmdir", JS_fn(F_rmdir));
-    EXPORTS("listImpl", JS_fn(F_list));
-    //EXPORTS("list", JS_fn(F_list));
-    EXPORTS("touchImpl", JS_fn(F_touchImpl));
-    //EXPORTS("touch", JS_fn(F_touch));
+    EXPORTS("cwd", JS_fn(FILE_cwd));
+    //EXPORTS("canonical", JS_fn(FILE_canonical));
+    EXPORTS("canonicalImpl", JS_fn(FILE_canonicalImpl));
+    EXPORTS("mtime", JS_fn(FILE_mtime));
+    EXPORTS("size", JS_fn(FILE_size));
+    EXPORTS("stat", JS_fn(FILE_stat));
+    EXPORTS("exists", JS_fn(FILE_exists));
+    EXPORTS("linkExists", JS_fn(FILE_linkExists));
+    EXPORTS("isDirectory", JS_fn(FILE_isDirectory));
+    EXPORTS("isFile", JS_fn(FILE_isFile));
+    EXPORTS("isLink", JS_fn(FILE_isLink));
+    EXPORTS("isReadable", JS_fn(FILE_isReadable));
+    EXPORTS("isWritable", JS_fn(FILE_isWritable));
+    EXPORTS("chmod", JS_fn(FILE_chmod));
+    EXPORTS("chown", JS_fn(FILE_chown));
+    EXPORTS("link", JS_fn(FILE_link));
+    EXPORTS("symlink", JS_fn(FILE_symlink));
+    //EXPORTS("rename", JS_fn(FILE_rename));
+    //EXPORTS("move", JS_fn(FILE_rename));
+    EXPORTS("renameImpl", JS_fn(FILE_renameImpl));
+    //EXPORTS("move", JS_fn(FILE_move));
+    EXPORTS("remove", JS_fn(FILE_remove));
+    EXPORTS("mkdir", JS_fn(FILE_mkdir));
+    //EXPORTS("mkdirs", JS_fn(FILE_mkdirs));
+    EXPORTS("rmdir", JS_fn(FILE_rmdir));
+    //EXPORTS("listImpl", JS_fn(FILE_list));
+    EXPORTS("list", JS_fn(FILE_list));
+    EXPORTS("touchImpl", JS_fn(FILE_touchImpl));
+    //EXPORTS("touch", JS_fn(FILE_touch));
     
-    NWObject file_engine_js = require("file-engine.js");
+    NWObject file_engine_js = NW_require("file-engine.js");
     EXPORTS("mkdirs", GET_VALUE(file_engine_js, "mkdirs"));
     EXPORTS("touch", GET_VALUE(file_engine_js, "touch"));
     EXPORTS("rename", GET_VALUE(file_engine_js, "rename"));

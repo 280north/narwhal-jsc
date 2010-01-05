@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# get the absolute path of the executable
+SELF_PATH=$(cd -P -- "$(dirname -- "$0")" && pwd -P) && SELF_PATH="$SELF_PATH/$(basename -- "$0")"
+
+# resolve symlinks
+while [ -h "$SELF_PATH" ]; do
+	DIR=$(dirname -- "$SELF_PATH")
+	SYM=$(readlink -- "$SELF_PATH")
+	SELF_PATH=$(cd -- "$DIR" && cd -- $(dirname -- "$SYM") && pwd)/$(basename -- "$SYM")
+done
+
+# NARWHAL_ENGINE_HOME is the 2nd ancestor directory of this shell script
+export NARWHAL_ENGINE_HOME=$(dirname -- "$(dirname -- "$SELF_PATH")")
+
+# determine mode
+if [ -z "$NARWHAL_JSC_MODE" ] && [ -f "$NARWHAL_ENGINE_HOME/narwhal-jsc.conf" ]; then
+    source "$NARWHAL_ENGINE_HOME/narwhal-jsc.conf"
+fi
+if [ -z "$NARWHAL_JSC_MODE" ]; then
+    NARWHAL_JSC_MODE="jscore"
+fi
+export NARWHAL_JSC_MODE
+
+EXECUTABLE_PATH="$NARWHAL_ENGINE_HOME/bin/narwhal-$NARWHAL_JSC_MODE"
+
+# TODO: LD_LIBRARY_PATH
+
+exec "$EXECUTABLE_PATH" "$@"

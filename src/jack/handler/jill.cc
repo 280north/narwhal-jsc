@@ -252,7 +252,7 @@ NWValue handlerWrapper(
     HANDLE_EXCEPTION(true, true);
     
     // jsgi.erros
-    SET_VALUE(env, "jsgi.errors", GET_OBJECT(System, "stderr"));
+    SET_VALUE(env, "jsgi.errors", GET_OBJECT(NW_System, "stderr"));
     HANDLE_EXCEPTION(true, true);
     
     char *body;
@@ -546,7 +546,7 @@ int on_message_complete(http_parser *parser) {
     return 0;
 }
 
-FUNCTION(Jill_run, ARG_FN(app))
+FUNCTION(JILL_run, ARG_FN(app))
 {
     int port = 8080;
     int backlog = 100;
@@ -692,19 +692,18 @@ END
 
 NARWHAL_MODULE(http_server_engine)
 {
-    EXPORTS("run", JS_fn(Jill_run));
+    EXPORTS("run", JS_fn(JILL_run));
     
-    NWObject io = require("io");
+    NWObject io = NW_require("io");
     HANDLE_EXCEPTION(true, true);
     
     ByteIO = GET_OBJECT(io, "ByteIO");
     HANDLE_EXCEPTION(true, true);
     
-    NWObject binary = require("binary");
+    NWObject binary = NW_require("binary");
     HANDLE_EXCEPTION(true, true);
     
     ByteString = GET_OBJECT(binary, "ByteString");
     HANDLE_EXCEPTION(true, true);
-
 }
 END_NARWHAL_MODULE

@@ -1,4 +1,11 @@
-(function (evalGlobal, global) {
+(function bootstrap(evalGlobal, global) {
+    
+    var profiling = false;
+    if (typeof _inspector !== "undefined" && ENV["NARWHAL_PROFILE"]) {
+        profiling = true;
+        _inspector.startProfilingJavaScript_();
+    }
+        
     var debug = true;
 
     var prefix = ENV['NARWHAL_HOME'];
@@ -11,11 +18,11 @@
         var loader = {};
         var factories = {};
         
-        loader.reload = function(topId, path) {
+        loader.reload = function reload(topId, path) {
             factories[topId] = requireNative(topId, path);
         }
         
-        loader.load = function(topId, path) {
+        loader.load = function load(topId, path) {
             if (!factories.hasOwnProperty(topId))
                 loader.reload(topId, path);
             return factories[topId];
@@ -24,7 +31,9 @@
         return loader;
     };
 
-    var narwhal = eval(_read(prefix + "/narwhal.js"));
+    var sourceURLTag = "\n//@ sourceURL="+prefix+"/narwhal.js";
+    var narwhal = evalGlobal(_read(prefix + "/narwhal.js") + "/**/" + sourceURLTag);
+    narwhal.displayName = "narwhal";
     
     narwhal({
         global: global,
@@ -34,20 +43,26 @@
         prefix: prefix,
         prefixes: [enginePrefix, prefix],
         debug: debug,
-        print: function (string) { _print(String(string)); },
-        evaluate: function (text) {
-            return eval("(function(require,exports,module,system,print){" + text + "/**/\n})");
+        print: function print(string) { _print(String(string)); },
+        evaluate: function evaluate(text, fileName, lineNumber) {
+            var sourceURLTag = "\n//@ sourceURL=" + fileName;
+            //return new Function("require", "exports", "module", "system", "print", text+"/**/"+sourceURLTag);
+            return eval("(function(require,exports,module,system,print){" + text + "/**/\n})"+sourceURLTag);
         },
         fs: {
-            read: function(path) { return _read(path); },
-            isFile: function(path) { return _isFile(path); }
+            read: function read(path) { return _read(path); },
+            isFile: function isFile(path) { return _isFile(path); }
         },
         loaders: [[".dylib", NativeLoader()]],
         os : "darwin",
         debug: ENV['NARWHAL_DEBUG'],
         verbose: ENV['NARWHAL_VERBOSE']
     });
+    
+    if (profiling) {
+        _inspector.stopProfilingJavaScript_();
+    }
 
-})(function () {
+})(function evalGlobal() {
     return eval(arguments[0]);
 }, this);
