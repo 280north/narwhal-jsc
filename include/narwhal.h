@@ -9,6 +9,10 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
+#ifdef __cplusplus 
+extern "C" {
+#endif
+
 // platform name
 #define NARWHAL_JSC
 #define NARWHAL_VERSION "0.2a"
@@ -442,5 +446,8 @@ int narwhal(JSGlobalContextRef _context, JSValueRef *_exception, int argc, char 
 
 void* EvaluateREPL(JSContextRef _context, JSStringRef source);
 
+#ifdef __cplusplus 
+}
+#endif
 
 #endif

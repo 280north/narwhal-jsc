@@ -5,7 +5,7 @@
 
 NWObject IO;
 
-FUNCTION(OS_exit)
+FUNCTION(OS_exitImpl)
 {
     if (ARGC == 0)
     {
@@ -195,7 +195,7 @@ END
 
 NARWHAL_MODULE(os_engine)
 {
-    EXPORTS("exit", JS_fn(OS_exit));
+    EXPORTS("exitImpl", JS_fn(OS_exitImpl));
     EXPORTS("sleep", JS_fn(OS_sleep));
     EXPORTS("systemImpl", JS_fn(OS_systemImpl));
     EXPORTS("popenImpl", JS_fn(OS_popenImpl));
