@@ -310,7 +310,7 @@ FUNCTION(FILE_FileIO, ARG_UTF8_CAST(path))
     int appendFlag = GET_BOOL(modeObject, "append");
     int updateFlag = GET_BOOL(modeObject, "update");
     
-    DEBUG("path=%s readFlag=%d writeFlag=%d readFlag=%d readFlag=%d\n", path, readFlag, writeFlag, appendFlag, updateFlag);
+    DEBUG("path=%s readFlag=%d writeFlag=%d appendFlag=%d updateFlag=%d\n", path, readFlag, writeFlag, appendFlag, updateFlag);
     
     int oflag = 0;
     
@@ -322,7 +322,7 @@ FUNCTION(FILE_FileIO, ARG_UTF8_CAST(path))
         oflag = oflag | O_RDONLY;
         
     if (appendFlag)
-        oflag = oflag | O_APPEND;
+        oflag = oflag | O_APPEND | O_WRONLY;
     // if (!updateFlag)
     //     oflag = oflag | O_TRUNC;
     

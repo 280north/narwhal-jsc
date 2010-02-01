@@ -2,6 +2,9 @@
 
 #include <narwhal.h>
 
+#include <readline/history.h>
+#include <readline/readline.h>
+
 //#ifdef WEBKIT
 
 JSObjectRef JSObjectMakeArray(JSContextRef _context, size_t argc, const JSValueRef argv[],  JSValueRef* _exception)
