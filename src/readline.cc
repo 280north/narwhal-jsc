@@ -24,7 +24,7 @@ FUNCTION(READLINE_readline)
 }
 END
 
-FUNCTION(READLINE_add_history, ARG_UTF8(str))
+FUNCTION(READLINE_addHistory, ARG_UTF8(str))
 {
 	add_history(str);
 }
@@ -33,6 +33,6 @@ END
 NARWHAL_MODULE(readline)
 {
 	EXPORTS("readline", JS_fn(READLINE_readline));
-    EXPORTS("add_history", JS_fn(READLINE_add_history));
+    EXPORTS("addHistory", JS_fn(READLINE_addHistory));
 }
 END_NARWHAL_MODULE
