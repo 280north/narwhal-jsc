@@ -4,8 +4,6 @@
 #include <JavaScriptCore/JavaScriptCore.h>
 #include <dlfcn.h>
 #include <pthread.h>
-#include <readline/history.h>
-#include <readline/readline.h>
 #include <stdio.h>
 #include <sys/stat.h>
 
