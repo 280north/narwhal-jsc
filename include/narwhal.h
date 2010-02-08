@@ -1,10 +1,12 @@
 #ifndef __NARWHAL__
 #define __NARWHAL__
 
-#include <JavaScriptCore/JavaScriptCore.h>
+#include <JavaScriptCore/JavaScript.h>
 #include <dlfcn.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 
 #ifdef __cplusplus 
