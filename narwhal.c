@@ -2,6 +2,9 @@
 
 #include <narwhal.h>
 
+#include <readline/history.h>
+#include <readline/readline.h>
+
 //#ifdef WEBKIT
 
 JSObjectRef JSObjectMakeArray(JSContextRef _context, size_t argc, const JSValueRef argv[],  JSValueRef* _exception)
@@ -339,9 +342,11 @@ JSValueRef narwhal_wrapped(JSGlobalContextRef _context, JSValueRef *_exception, 
         buffer[len] = '\0';
         // make relative to symlink's directory
         if (buffer[0] != '/') {
-            char tmp[1024];
+            // glibc's dirname modifies it's argument so copy first
+            char tmp[1024], tmp2[1024];
             strcpy(tmp, buffer);
-            sprintf(buffer, "%s/%s", (char *)dirname(executable), tmp);
+            strcpy(tmp2, executable);
+            sprintf(buffer, "%s/%s", (char *)dirname(tmp2), tmp);
         }
         strcpy(executable, buffer);
     }
@@ -358,25 +363,33 @@ JSValueRef narwhal_wrapped(JSGlobalContextRef _context, JSValueRef *_exception, 
 
     // try getting NARWHAL_ENGINE_HOME from env variable. fall back to 2nd ancestor of executable path
     if (getenv("NARWHAL_ENGINE_HOME"))
-        strcpy(NARWHAL_ENGINE_HOME, getenv("NARWHAL_ENGINE_HOME"));
-    else
-        strcpy(NARWHAL_ENGINE_HOME, (char *)dirname((char *)dirname(executable)));
+        strcpy(NARWHAL_ENGINE_HOME, (char *)getenv("NARWHAL_ENGINE_HOME"));
+    else {
+        // glibc's dirname modifies it's argument so copy first
+        char tmp[1024];
+        strcpy(tmp, executable);
+        strcpy(NARWHAL_ENGINE_HOME, (char *)dirname((char *)dirname(tmp)));
+    }
 
     // try getting NARWHAL_HOME from env variable. fall back to 2nd ancestor of NARWHAL_ENGINE_HOME
     if (getenv("NARWHAL_HOME"))
-        strcpy(NARWHAL_HOME, getenv("NARWHAL_HOME"));
-    else
-        strcpy(NARWHAL_HOME, (char *)dirname((char *)dirname(NARWHAL_ENGINE_HOME)));
+        strcpy(NARWHAL_HOME, (char *)getenv("NARWHAL_HOME"));
+    else {
+        // glibc's dirname modifies it's argument so copy first
+        char tmp[1024];
+        strcpy(tmp, NARWHAL_ENGINE_HOME);
+        strcpy(NARWHAL_HOME, (char *)dirname((char *)dirname(tmp)));
+    }
 
     JSObjectRef ARGS = CALL(argvToArray, argc, argv);
     JSObjectRef ENV = CALL(envpToObject, envp);
 
     SET_VALUE(ENV, "NARWHAL_HOME",        JS_str_utf8(NARWHAL_HOME, strlen(NARWHAL_HOME)));
     SET_VALUE(ENV, "NARWHAL_ENGINE_HOME", JS_str_utf8(NARWHAL_ENGINE_HOME, strlen(NARWHAL_ENGINE_HOME)));
-    
+
     JSObjectRef context = CALL(Context_new, _context);
     ARGS_ARRAY(init_args, context, ARGS, ENV);
-    
+
     // HACK: call directly
     NW_inititialize(_context, NULL, NULL, 3, init_args, _exception);
     //CALL_AS_FUNCTION(JS_fn(NW_inititialize), JS_GLOBAL, 3, init_args);

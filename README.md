@@ -38,6 +38,27 @@ For example, to enable the debugger (doesn't automatically break though):
 
     _inspector.startDebuggingJavaScript_();
 
+The following methods are currently exposed through `_inspector`:
+
+    _inspector.show_();
+    _inspector.showConsole_();
+    _inspector.close_();
+    _inspector.attach_();
+    _inspector.detach_();
+
+    currentlyDebugging = _inspector.isDebuggingJavaScript();
+    _inspector.toggleDebuggingJavaScript_();
+    _inspector.startDebuggingJavaScript_();
+    _inspector.stopDebuggingJavaScript_();
+
+    enabled = _inspector.isJavaScriptProfilingEnabled();
+    _inspector.setJavaScriptProfilingEnabled_(enabled);
+
+    currentlyProfiling = _inspector.isProfilingJavaScript();
+    _inspector.toggleProfilingJavaScript_();
+    _inspector.startProfilingJavaScript_();
+    _inspector.stopProfilingJavaScript_();
+
 
 Notes
 -----

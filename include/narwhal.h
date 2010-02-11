@@ -1,12 +1,12 @@
 #ifndef __NARWHAL__
 #define __NARWHAL__
 
-#include <JavaScriptCore/JavaScriptCore.h>
+#include <JavaScriptCore/JavaScript.h>
 #include <dlfcn.h>
 #include <pthread.h>
-#include <readline/history.h>
-#include <readline/readline.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 
 #ifdef __cplusplus 
@@ -305,7 +305,7 @@ bool _HAS_PROPERTY(JSContextRef _context, JSObjectRef object, const char *proper
 #define END \
     }
 
-#define NARWHAL_MODULE(MODULE_NAME) \
+#define NARWHAL_MODULE(module_name) \
     JSObjectRef NW_Require; \
     JSObjectRef NW_Exports; \
     JSObjectRef NW_Module; \
@@ -324,13 +324,13 @@ bool _HAS_PROPERTY(JSContextRef _context, JSObjectRef object, const char *proper
         return JSValueToObject(_context, JSObjectCallAsFunction(_context, NW_Require, NULL, 1, argv, NULL), NULL); \
     }\
     \
-    const char *moduleName = STRINGIZE(MODULE_NAME);\
+    const char *moduleName = STRINGIZE(NWM_ ## module_name);\
     extern "C" const char * narwhalModuleInit(NarwhalContext *_narwhal_context) { \
         narwhal_context = *_narwhal_context; \
         return moduleName; \
     }\
     \
-    extern "C" FUNC_HEADER(MODULE_NAME) \
+    extern "C" FUNC_HEADER(NWM_ ## module_name) \
         { _context = _ctx; \
         ARG_COUNT(5); \
         NW_Require = JSValueToObject(_context, ARGV(0), _exception); \

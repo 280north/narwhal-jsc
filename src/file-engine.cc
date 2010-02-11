@@ -51,7 +51,7 @@ FUNCTION(FILE_mtime, ARG_UTF8_CAST(path))
 	struct stat stat_info;
     int ret = stat(PATH_OR_DOT(path), &stat_info);
     if (ret < 0)
-        THROW("mtime: %s", strerror(errno));
+        THROW("FIXME: mtime: %s", strerror(errno));
     
     long long timestamp = ((long long)(stat_info.st_mtime)) * 1000;
 
@@ -266,7 +266,7 @@ FUNCTION(FILE_list, ARG_UTF8_CAST(path))
     struct dirent *dirp;
 
     if((dp  = opendir(PATH_OR_DOT(path))) == NULL) {
-        THROW("%s", strerror(errno));
+        THROW("Listing %s failed: %s", path, strerror(errno));
     }
 
     NWObject array = JS_array(0, NULL);
@@ -310,7 +310,7 @@ FUNCTION(FILE_FileIO, ARG_UTF8_CAST(path))
     int appendFlag = GET_BOOL(modeObject, "append");
     int updateFlag = GET_BOOL(modeObject, "update");
     
-    DEBUG("path=%s readFlag=%d writeFlag=%d readFlag=%d readFlag=%d\n", path, readFlag, writeFlag, appendFlag, updateFlag);
+    DEBUG("path=%s readFlag=%d writeFlag=%d appendFlag=%d updateFlag=%d\n", path, readFlag, writeFlag, appendFlag, updateFlag);
     
     int oflag = 0;
     
@@ -322,7 +322,7 @@ FUNCTION(FILE_FileIO, ARG_UTF8_CAST(path))
         oflag = oflag | O_RDONLY;
         
     if (appendFlag)
-        oflag = oflag | O_APPEND;
+        oflag = oflag | O_APPEND | O_WRONLY;
     // if (!updateFlag)
     //     oflag = oflag | O_TRUNC;
     
@@ -336,7 +336,7 @@ FUNCTION(FILE_FileIO, ARG_UTF8_CAST(path))
         int fd = open(path, oflag, 0644);
         DEBUG("fd=%d\n", fd);
         if (fd < 0)
-            THROW("%s: %s", strerror(errno), path);
+            THROW("Opening %s failed: %s", path, strerror(errno));
 
         ARGS_ARRAY(argv, JS_int(-1), JS_int(fd));
         return TO_OBJECT(CALL_AS_CONSTRUCTOR(IO, 2, argv));
@@ -345,7 +345,7 @@ FUNCTION(FILE_FileIO, ARG_UTF8_CAST(path))
         int fd = open(path, oflag);
         DEBUG("fd=%d\n", fd);
         if (fd < 0)
-            THROW("%s: %s", strerror(errno), path);
+            THROW("Opening %s failed: %s", path, strerror(errno));
 
         ARGS_ARRAY(argv, JS_int(fd), JS_int(-1));
         return CALL_AS_CONSTRUCTOR(IO, 2, argv);

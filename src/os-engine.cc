@@ -1,6 +1,8 @@
 #include <narwhal.h>
 
+#include <errno.h>
 #include <stdlib.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 NWObject IO;
