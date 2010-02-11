@@ -312,7 +312,6 @@ bool _HAS_PROPERTY(JSContextRef _context, JSObjectRef object, const char *proper
     JSObjectRef NW_System; \
     JSObjectRef NW_Print; \
     JSContextRef _context; \
-    NarwhalContext narwhal_context; \
     \
     void print(const char * string)\
     {\
@@ -325,8 +324,7 @@ bool _HAS_PROPERTY(JSContextRef _context, JSObjectRef object, const char *proper
     }\
     \
     const char *moduleName = STRINGIZE(NWM_ ## module_name);\
-    extern "C" const char * narwhalModuleInit(NarwhalContext *_narwhal_context) { \
-        narwhal_context = *_narwhal_context; \
+    extern "C" const char * narwhalModuleInit() { \
         return moduleName; \
     }\
     \
@@ -392,20 +390,6 @@ struct __NarwhalContext {
     JSContextRef context;
 };
 
-extern NarwhalContext narwhal_context;
-
-#define LOCK() \
-    {DEBUG("locking %p (%lu)\n", narwhal_context.mutex, (unsigned long)pthread_self()) \
-    int ret = pthread_mutex_lock(narwhal_context.mutex); \
-    if (ret) fprintf(stderr, "pthread_mutex_lock error: %d", ret); \
-    else {DEBUG("locked %p (%lu)\n", narwhal_context.mutex, (unsigned long)pthread_self())} };
-
-#define UNLOCK() \
-    {DEBUG("unlocking %p (%lu)\n", narwhal_context.mutex, (unsigned long)pthread_self()) \
-    int ret = pthread_mutex_unlock(narwhal_context.mutex); \
-    if (ret) fprintf(stderr, "pthread_mutex_unlock error: %d", ret); \
-    else {DEBUG("unlocked %p (%lu)\n", narwhal_context.mutex, (unsigned long)pthread_self())}};
-
 JSClassRef Custom_class(JSContextRef _context)
 {
     static JSClassRef jsClass;
@@ -424,7 +408,6 @@ extern JSObjectRef NW_Module;
 extern JSObjectRef NW_System;
 extern JSObjectRef NW_Print;
 extern JSContextRef _context;
-extern NarwhalContext narwhal_context;
 extern void print(const char * string);
 extern JSObjectRef NW_require(const char *id);
 

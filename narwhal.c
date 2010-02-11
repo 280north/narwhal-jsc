@@ -33,9 +33,6 @@ JSObjectRef JSObjectMakeRegExp(JSContextRef _context, size_t argc, const JSValue
 
 //#endif
 
-
-NarwhalContext narwhal_context;
-
 // Reads a file into a v8 string.
 JSStringRef ReadFile(const char* name) {
     FILE* file = fopen(name, "rb");
@@ -102,8 +99,8 @@ FUNCTION(NW_isFile, ARG_UTF8(path))
 }
 END
 
-typedef JSObjectCallAsFunctionCallback factory_t;
-typedef const char *(*getModuleName_t)(NarwhalContext *);
+typedef JSObjectCallAsFunctionCallback NW_factory_t;
+typedef const char *(*NW_narwhalModuleInit_t)();
 
 FUNCTION(NW_requireNative, ARG_UTF8(topId), ARG_UTF8(path))
 {
@@ -117,15 +114,15 @@ FUNCTION(NW_requireNative, ARG_UTF8(topId), ARG_UTF8(path))
         return JS_null;
     }
     
-    getModuleName_t narwhalModuleInit = (getModuleName_t)dlsym(handle, "narwhalModuleInit");
+    NW_narwhalModuleInit_t narwhalModuleInit = (NW_narwhalModuleInit_t)dlsym(handle, "narwhalModuleInit");
     if (narwhalModuleInit == NULL) {
         fprintf(stderr, "dlsym (getModuleName) error: %s\n", dlerror());
         return JS_null;
     }
     
-    const char *moduleName = narwhalModuleInit(&narwhal_context);
+    const char *moduleName = narwhalModuleInit();
     
-    factory_t func = (factory_t)dlsym(handle, moduleName);
+    NW_factory_t func = (NW_factory_t)dlsym(handle, moduleName);
     if (func == NULL) {
         fprintf(stderr, "dlsym (%s) error: %s\n", moduleName, dlerror());
         return JS_null;
@@ -209,13 +206,9 @@ void* RunREPL(JSContextRef _context) {
         JSStringRef source = JSStringCreateWithUTF8CString(str);
         free(str);
         
-        LOCK();
-        
         EvaluateREPL(_context, source);
         
         JSStringRelease(source);
-        
-        UNLOCK();
         
 #ifdef JSCOCOA
         [pool drain];
@@ -322,13 +315,6 @@ END
 
 JSValueRef narwhal_wrapped(JSGlobalContextRef _context, JSValueRef *_exception, int argc, char *argv[], char *envp[], int runShell)
 {
-    pthread_mutex_t	_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-    narwhal_context.context = _context;
-    narwhal_context.mutex = &_mutex;
-    
-    LOCK();
-    
     // TODO: cleanup all this. strcpy, sprintf, etc BAD!
     char executable[1024];
     char buffer[1024];
@@ -393,8 +379,6 @@ JSValueRef narwhal_wrapped(JSGlobalContextRef _context, JSValueRef *_exception, 
     // HACK: call directly
     NW_inititialize(_context, NULL, NULL, 3, init_args, _exception);
     //CALL_AS_FUNCTION(JS_fn(NW_inititialize), JS_GLOBAL, 3, init_args);
-    
-    UNLOCK();
     
     // TODO: move this to JS.
     if (!*_exception && argc <= 1 && runShell)
