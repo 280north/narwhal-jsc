@@ -221,6 +221,102 @@ void* RunREPL(JSContextRef _context) {
     printf("\n");
 }
 
+DESTRUCTOR(Context_finalize)
+{    
+    GET_INTERNAL(ContextPrivate *, data, object);
+    DEBUG("freeing Context=[%p]\n", data);
+    if (data) {
+        // free data->context
+        free(data);
+    }
+}
+END
+JSClassRef Context_class(JSContextRef _context)
+{
+    static JSClassRef jsClass;
+    if (!jsClass)
+    {
+        JSClassDefinition definition = kJSClassDefinitionEmpty;
+        definition.className = "Context";
+        definition.finalize = Context_finalize;
+
+        jsClass = JSClassCreate(&definition);
+    }
+    return jsClass;
+}
+JSObjectRef Context_new(JSContextRef _context, JSValueRef *_exception, JSContextRef context)
+{
+    ContextPrivate *data = (ContextPrivate*)malloc(sizeof(ContextPrivate));
+    if (!data) return NULL;
+    
+    data->context = context;
+    
+    return JSObjectMake(_context, Context_class(_context), data);
+}
+
+FUNCTION(NW_inititialize, ARG_OBJ(context), ARG_OBJ(ARGS), ARG_OBJ(ENV))
+{    
+    GET_INTERNAL(ContextPrivate*, data, context);
+    
+    // printf("=========\n");
+    // JS_Print(context);
+    // JS_Print(ARGS);
+    // JS_Print(ENV);
+    // printf("---------\n");
+    // 
+    // printf("=========\n");
+    // JS_Print(context);
+    // JS_Print(ARGS);
+    // JS_Print(ENV);
+    // printf("+++++++++\n");
+    
+    JSValueRef NARWHAL_HOME_val = GET_VALUE(ENV, "NARWHAL_HOME");
+    JSValueRef NARWHAL_ENGINE_HOME_val = GET_VALUE(ENV, "NARWHAL_ENGINE_HOME");
+    
+    // printf("=========\n");
+    // JS_Print(NARWHAL_HOME_val);
+    // JS_Print(NARWHAL_ENGINE_HOME_val);
+    // printf(".........\n");
+    
+    GET_UTF8(NARWHAL_HOME, NARWHAL_HOME_val);
+    GET_UTF8(NARWHAL_ENGINE_HOME, NARWHAL_ENGINE_HOME_val);
+    
+    // printf("_context=%p\n", _context);
+    _context = data->context;
+    // printf("_context=%p\n", _context);
+    
+    JSObjectRef global = JS_GLOBAL;
+    
+    SET_VALUE(global, "print",          JS_fn(NW_print));
+    SET_VALUE(global, "isFile",         JS_fn(NW_isFile));
+    SET_VALUE(global, "read",           JS_fn(NW_read));
+    SET_VALUE(global, "requireNative",  JS_fn(NW_requireNative));
+    SET_VALUE(global, "ARGS",           ARGS);
+    SET_VALUE(global, "ENV",            ENV);
+    // SET_VALUE(global, "narwhal_init",   JS_fn(NW_inititialize));
+    
+    // Load bootstrap.js
+    char *bootstrapPathRelative = "/bootstrap.js";
+    char bootstrapPathFull[strlen(NARWHAL_ENGINE_HOME) + strlen(bootstrapPathRelative) + 1];
+    snprintf(bootstrapPathFull, sizeof(bootstrapPathFull), "%s%s", NARWHAL_ENGINE_HOME, bootstrapPathRelative);
+    
+    JSStringRef bootstrapSource = ReadFile(bootstrapPathFull);
+    if (!bootstrapSource) {
+        THROW("Error reading %s\n", bootstrapPathFull);
+    }
+    
+    JSStringRef bootstrapTag = JSStringCreateWithUTF8CString(bootstrapPathFull);
+    
+    JSEvaluateScript(_context, bootstrapSource, 0, bootstrapTag, 0, _exception);
+    if (*_exception) {
+        JS_Print(*_exception);
+    }
+    
+    JSStringRelease(bootstrapSource);
+    JSStringRelease(bootstrapTag);
+}
+END
+
 JSValueRef narwhal_wrapped(JSGlobalContextRef _context, JSValueRef *_exception, int argc, char *argv[], char *envp[], int runShell)
 {
     pthread_mutex_t	_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -274,44 +370,22 @@ JSValueRef narwhal_wrapped(JSGlobalContextRef _context, JSValueRef *_exception, 
 
     JSObjectRef ARGS = CALL(argvToArray, argc, argv);
     JSObjectRef ENV = CALL(envpToObject, envp);
-    
+
     SET_VALUE(ENV, "NARWHAL_HOME",        JS_str_utf8(NARWHAL_HOME, strlen(NARWHAL_HOME)));
     SET_VALUE(ENV, "NARWHAL_ENGINE_HOME", JS_str_utf8(NARWHAL_ENGINE_HOME, strlen(NARWHAL_ENGINE_HOME)));
-
-    JSObjectRef global = JS_GLOBAL;
-
-    SET_VALUE(global, "print",          JS_fn(NW_print));
-    SET_VALUE(global, "isFile",         JS_fn(NW_isFile));
-    SET_VALUE(global, "read",           JS_fn(NW_read));
-    SET_VALUE(global, "requireNative",  JS_fn(NW_requireNative));
-    SET_VALUE(global, "ARGS",           ARGS);
-    SET_VALUE(global, "ENV",            ENV);
     
-    // Load bootstrap.js
-    char *bootstrapPathRelative = "/bootstrap.js";
-    char bootstrapPathFull[strlen(NARWHAL_ENGINE_HOME) + strlen(bootstrapPathRelative) + 1];
-    snprintf(bootstrapPathFull, sizeof(bootstrapPathFull), "%s%s", NARWHAL_ENGINE_HOME, bootstrapPathRelative);
+    JSObjectRef context = CALL(Context_new, _context);
+    ARGS_ARRAY(init_args, context, ARGS, ENV);
     
-    JSStringRef bootstrapSource = ReadFile(bootstrapPathFull);
-    if (!bootstrapSource) {
-        THROW("Error reading bootstrap.js\n");
-    }
-    
-    JSStringRef bootstrapTag = JSStringCreateWithUTF8CString(bootstrapPathFull);
-    
-    JSEvaluateScript(_context, bootstrapSource, 0, bootstrapTag, 0, _exception);
-    if (*_exception) {
-        JS_Print(*_exception);
-    }
-    
-    JSStringRelease(bootstrapSource);
-    JSStringRelease(bootstrapTag);
+    // HACK: call directly
+    NW_inititialize(_context, NULL, NULL, 3, init_args, _exception);
+    //CALL_AS_FUNCTION(JS_fn(NW_inititialize), JS_GLOBAL, 3, init_args);
     
     UNLOCK();
     
+    // TODO: move this to JS.
     if (!*_exception && argc <= 1 && runShell)
         RunREPL(_context);
-
 }
 
 int narwhal(JSGlobalContextRef _context, JSValueRef *_exception, int argc, char *argv[], char *envp[], int runShell)

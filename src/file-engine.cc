@@ -336,7 +336,7 @@ FUNCTION(FILE_FileIO, ARG_UTF8_CAST(path))
         int fd = open(path, oflag, 0644);
         DEBUG("fd=%d\n", fd);
         if (fd < 0)
-            THROW("%s", strerror(errno));
+            THROW("%s: %s", strerror(errno), path);
 
         ARGS_ARRAY(argv, JS_int(-1), JS_int(fd));
         return TO_OBJECT(CALL_AS_CONSTRUCTOR(IO, 2, argv));
@@ -345,7 +345,7 @@ FUNCTION(FILE_FileIO, ARG_UTF8_CAST(path))
         int fd = open(path, oflag);
         DEBUG("fd=%d\n", fd);
         if (fd < 0)
-            THROW("%s", strerror(errno));
+            THROW("%s: %s", strerror(errno), path);
 
         ARGS_ARRAY(argv, JS_int(fd), JS_int(-1));
         return CALL_AS_CONSTRUCTOR(IO, 2, argv);

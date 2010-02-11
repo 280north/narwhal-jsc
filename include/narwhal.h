@@ -382,7 +382,7 @@ int _GET_UTF16(JSContextRef _context, JSValueRef *_exception, JSValueRef str, JS
     return 1;
 }
 
-#define CALL(f, ...) f(_context, _exception, __VA_ARGS__)
+#define CALL(f, ...) f(_context, _exception, ##__VA_ARGS__)
 
 #define JS_Print(value) CALL(JSValuePrint, value)
 
@@ -412,6 +412,7 @@ JSClassRef Custom_class(JSContextRef _context)
     if (!jsClass)
     {
         JSClassDefinition definition = kJSClassDefinitionEmpty;
+        definition.className = "Custom";
         jsClass = JSClassCreate(&definition);
     }
     return jsClass;
@@ -445,6 +446,14 @@ JSValueRef _PROTECT(JSContextRef _context, JSValueRef value) {
 int narwhal(JSGlobalContextRef _context, JSValueRef *_exception, int argc, char *argv[], char *envp[], int runShell);
 
 void* EvaluateREPL(JSContextRef _context, JSStringRef source);
+
+typedef struct __ContextPrivate {
+    JSContextRef context;
+} ContextPrivate;
+
+JSObjectRef Context_new(JSContextRef _context, JSValueRef *_exception, JSContextRef context);
+
+FUNC_HEADER(NW_inititialize);
 
 #ifdef __cplusplus 
 }

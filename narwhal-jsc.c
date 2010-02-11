@@ -40,11 +40,7 @@ int main(int argc, char *argv[], char *envp[])
         
         CALL(narwhal, argc, argv, envp, 1);
     
-        int code = 0;
-        if (*_exception) {
-            code = 1;
-            JS_Print(*_exception);
-        }
+        int code = !!(*_exception);
         
         #ifdef WEBKIT
             [pool drain];

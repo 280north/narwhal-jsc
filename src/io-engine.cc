@@ -348,7 +348,7 @@ extern "C" JSClassRef IO_class(JSContextRef _context)
         };
 
         JSClassDefinition definition = kJSClassDefinitionEmpty;
-        definition.className = "IO"; 
+        definition.className = "IO";
         definition.staticFunctions = staticFuctions;
         definition.finalize = IO_finalize;
         definition.callAsConstructor = IO_constructor;
