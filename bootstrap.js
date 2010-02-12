@@ -1,15 +1,19 @@
 (function bootstrap(evalGlobal, global) {
+    function envEnabled(name) {
+        return ENV[name] && parseInt(ENV[name]) !== 0;
+    }
     
     var profiling = false;
-    if (typeof _inspector !== "undefined" && ENV["NARWHAL_PROFILE"]) {
+    if (typeof _inspector !== "undefined" && envEnabled("NARWHAL_PROFILE")) {
         profiling = true;
         _inspector.startProfilingJavaScript_();
     }
-        
-    var debug = true;
 
     var prefix = ENV['NARWHAL_HOME'];
     var enginePrefix = ENV['NARWHAL_ENGINE_HOME'];
+
+    var debug = envEnabled("NARWHAL_DEBUG");
+    var verbose = envEnabled("NARWHAL_DEBUG");
 
     var _isFile = isFile, _read = read, _print = print;
     delete read, isFile, print;
@@ -42,7 +46,6 @@
         engines: ['jsc', 'c', 'default'],
         prefix: prefix,
         prefixes: [enginePrefix, prefix],
-        debug: debug,
         print: function print(string) { _print(String(string)); },
         evaluate: function evaluate(text, fileName, lineNumber) {
             var sourceURLTag = "\n//@ sourceURL=" + fileName;
@@ -55,8 +58,8 @@
         },
         loaders: [[".dylib", NativeLoader()]],
         os : "darwin",
-        debug: ENV['NARWHAL_DEBUG'],
-        verbose: ENV['NARWHAL_VERBOSE']
+        debug: debug,
+        verbose: verbose
     });
     
     if (profiling) {
