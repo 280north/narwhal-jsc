@@ -8,6 +8,11 @@
         profiling = true;
         _inspector.startProfilingJavaScript_();
     }
+    
+    if (typeof _inspector !== "undefined" && envEnabled("NARWHAL_DEBUGGER")) {
+        _inspector.show_();
+        _inspector.startDebuggingJavaScript_();
+    }
 
     var prefix = ENV['NARWHAL_HOME'];
     var enginePrefix = ENV['NARWHAL_ENGINE_HOME'];

@@ -13,6 +13,10 @@ done
 # NARWHAL_ENGINE_HOME is the 2nd ancestor directory of this shell script
 export NARWHAL_ENGINE_HOME=$(dirname -- "$(dirname -- "$SELF_PATH")")
 
+if [ "$NARWHAL_DEBUGGER" ] && [ "$NARWHAL_DEBUGGER" -ne 0 ]; then
+    NARWHAL_JSC_MODE="webkit-debug"
+fi
+
 # determine mode
 if [ -z "$NARWHAL_JSC_MODE" ] && [ -f "$NARWHAL_ENGINE_HOME/narwhal-jsc.conf" ]; then
     source "$NARWHAL_ENGINE_HOME/narwhal-jsc.conf"

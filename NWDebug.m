@@ -152,6 +152,8 @@ void NW_register_defaults()
             
             [NSNumber numberWithBool:YES], @"WebKit Web Inspector Setting - debuggerEnabled",
             [NSNumber numberWithBool:YES], @"WebKit Web Inspector Setting - profilerEnabled",
+            @"scripts", @"WebKit Web Inspector Setting - lastActivePanel",
+
             //[NSNumber numberWithBool:YES], @"WebKit Web Inspector Setting - resourceTrackingEnabled",
             nil]];
 
