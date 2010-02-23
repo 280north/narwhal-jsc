@@ -1,6 +1,7 @@
 CPP       =g++
 CC        =gcc
-CPPFLAGS  = -0s -force_cpusubtype_ALL -mmacosx-version-min=10.4 -arch i386 -arch ppc
+#CPPFLAGS  = -0s
+#CPPFLAGS +=-force_cpusubtype_ALL -mmacosx-version-min=10.4 -arch i386 -arch ppc
 #CPPFLAGS += -g -O0
 #CPPFLAGS += -DDEBUG_ON
 #CPPFLAGS += -save-temps
@@ -11,9 +12,14 @@ FRAMEWORKS_DIR=frameworks
 
 LIB_DIR   =lib
 
-INCLUDES  =-Iinclude
+INCLUDES  =-Iinclude -I/usr/include -I/usr/local/include/webkit-1.0
 MODULES   =$(patsubst %.cc,%.dylib,$(patsubst src/%,lib/%,$(shell find src -name '*.cc')))
-LIBS      =-framework JavaScriptCore -L/usr/lib -lreadline -liconv -L$(LIB_DIR) -lnarwhal $(FRAMEWORKS)
+LIBS      =-L/lib -L/usr/lib -lreadline -liconv -L$(LIB_DIR) -L/usr/local/lib -lwebkit-1.0 -lnarwhal
+LIBS1     =-L/lib -L/usr/lib -lreadline -liconv -L$(LIB_DIR) -L/usr/local/lib -lwebkit-1.0
+
+SHARED_LIB_FLAGS=-shared
+#SHARED_LIB_FLAGS=-dynamiclib
+SHARED_LIB_EXT=so
 
 SOURCE    =narwhal-jsc.c
 
@@ -25,48 +31,48 @@ JSCORE_CHECKOUT=deps/JavaScriptCore
 SYSTEM_JSC=/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/JavaScriptCore
 RELATIVE_JSC=@executable_path/../frameworks/JavaScriptCore.framework/JavaScriptCore
 
-ABSOLUTE_LIBNARWHAL=$(LIB_DIR)/libnarwhal.dylib
-RELATIVE_LIBNARWHAL=@executable_path/../lib/libnarwhal.dylib
+ABSOLUTE_LIBNARWHAL=$(LIB_DIR)/libnarwhal.$(SHARED_LIB_EXT)
+RELATIVE_LIBNARWHAL=@executable_path/../lib/libnarwhal.$(SHARED_LIB_EXT)
 
 JSCOCOA_FRAMEWORK=$(FRAMEWORKS_DIR)/JSCocoa.framework
 JSCOCOA_BUILD=deps/JSCocoa/JSCocoa/build/Release/JSCocoa.framework
 JSCOCOA_CHECKOUT=deps/JSCocoa
 
 all: webkit webkit-debug jscore
-	
+
 jscore: 		bin/narwhal-jscore modules config-jscore
 webkit: 		bin/narwhal-webkit modules config-webkit
 webkit-debug:	bin/narwhal-webkit-debug modules config-webkit-debug
 jscocoa: 		frameworks-jscocoa bin/narwhal-jscocoa modules config-jscocoa
 
 
-lib/libnarwhal.dylib: narwhal.c
-	$(CC) -o $@ $< -dynamiclib $(CPPFLAGS) $(INCLUDES) $(FRAMEWORKS) -framework JavaScriptCore -lreadline 
+lib/libnarwhal.$(SHARED_LIB_EXT): narwhal.c
+	$(CC) -o $@ $< $(CPPFLAGS) $(INCLUDES) $(LIBS1) $(SHARED_LIB_FLAGS)
 
-bin/narwhal-jscore: $(SOURCE) lib/libnarwhal.dylib
+bin/narwhal-jscore: $(SOURCE) lib/libnarwhal.$(SHARED_LIB_EXT)
 	mkdir -p `dirname $@`
 	$(CC) -o $@ $(SOURCE) $(CPPFLAGS) $(INCLUDES) $(LIBS)
-	install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$@"
+	#install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$@"
 
-bin/narwhal-webkit: $(SOURCE) lib/libnarwhal.dylib
+bin/narwhal-webkit: $(SOURCE) lib/libnarwhal.$(SHARED_LIB_EXT)
 	mkdir -p `dirname $@`
 	$(CC) -o $@ -DWEBKIT -x objective-c $(SOURCE) $(CPPFLAGS) $(INCLUDES) $(LIBS) \
 		-framework Foundation -framework WebKit
-	install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$@"
+	#install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$@"
 
-bin/narwhal-webkit-debug: $(SOURCE) NWDebug.m lib/libnarwhal.dylib
+bin/narwhal-webkit-debug: $(SOURCE) NWDebug.m lib/libnarwhal.$(SHARED_LIB_EXT)
 	mkdir -p `dirname $@`
 	$(CC) -o $@ -DWEBKIT_DEBUG -x objective-c $(SOURCE) NWDebug.m $(CPPFLAGS) $(INCLUDES) $(LIBS) \
 		-framework Foundation -framework WebKit \
 		-framework AppKit -sectcreate __TEXT __info_plist Info.plist
-	install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$@"
+    # install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$@"
 
-bin/narwhal-jscocoa: $(SOURCE) lib/libnarwhal.dylib
+bin/narwhal-jscocoa: $(SOURCE) lib/libnarwhal.$(SHARED_LIB_EXT)
 	mkdir -p `dirname $@`
 	$(CC) -o $@ -DJSCOCOA -x objective-c $(SOURCE) $(CPPFLAGS) $(INCLUDES) $(LIBS) \
 		-framework Foundation -framework WebKit \
 		-framework JSCocoa
-	install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$@"
+    # install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$@"
 
 
 config-jscore:
@@ -93,19 +99,19 @@ modules: $(MODULES) rewrite-lib-paths
 
 rewrite-lib-paths:
 	#find lib -name "*.dylib" \! -path "*.dSYM*" -exec install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" {} \;
-	find lib -name "*.dylib" \! -path "*.dSYM*" -exec install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" {} \;
-	
+    # find lib -name "*.dylib" \! -path "*.dSYM*" -exec install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" {} \;
+
 lib/%.dylib: src/%.cc
 	mkdir -p `dirname $@`
-	$(CPP) -o $@ $< $(CPPFLAGS) $(INCLUDES) -dynamiclib $(LIBS)
+	$(CPP) -o $@ $< $(CPPFLAGS) $(INCLUDES) $(SHARED_LIB_FLAGS) $(LIBS)
 	#install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" "$@"
 
 lib/jack/handler/jill.dylib: src/jack/handler/jill.cc deps/http-parser/http_parser.o lib/io-engine.dylib lib/binary-engine.dylib
 	mkdir -p `dirname $@`
-	$(CPP) -o $@ $< $(CPPFLAGS) $(INCLUDES) -dynamiclib $(LIBS) deps/http-parser/http_parser.o lib/io-engine.dylib lib/binary-engine.dylib
+	$(CPP) -o $@ $< $(CPPFLAGS) $(INCLUDES) $(SHARED_LIB_FLAGS) $(LIBS) deps/http-parser/http_parser.o lib/io-engine.dylib lib/binary-engine.dylib
 	#install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" "$@"
-	install_name_tool -change "lib/io-engine.dylib" "@executable_path/../lib/io-engine.dylib" "$@"
-	install_name_tool -change "lib/binary-engine.dylib" "@executable_path/../lib/binary-engine.dylib" "$@"
+    # install_name_tool -change "lib/io-engine.dylib" "@executable_path/../lib/io-engine.dylib" "$@"
+    # install_name_tool -change "lib/binary-engine.dylib" "@executable_path/../lib/binary-engine.dylib" "$@"
 
 deps/http-parser/http_parser.o:
 	cd deps/http-parser && make http_parser.o
@@ -119,7 +125,7 @@ frameworks-jscocoa: $(JSCOCOA_FRAMEWORK)
 $(JSCORE_FRAMEWORK): $(JSCORE_BUILD)
 	mkdir -p `dirname $@`
 	cp -r $< $@
-	install_name_tool -id "@executable_path/../$(FRAMEWORKS_DIR)/JavaScriptCore.framework/JavaScriptCore" $@/JavaScriptCore
+	# install_name_tool -id "@executable_path/../$(FRAMEWORKS_DIR)/JavaScriptCore.framework/JavaScriptCore" $@/JavaScriptCore
 $(JSCORE_BUILD): $(JSCORE_CHECKOUT)
 	cd deps/JavaScriptCore && xcodebuild -target JavaScriptCore -configuration $(JSCORE_CONFIG)
 $(JSCORE_CHECKOUT):
@@ -129,8 +135,8 @@ $(JSCORE_CHECKOUT):
 $(JSCOCOA_FRAMEWORK): $(JSCOCOA_BUILD)
 	mkdir -p `dirname $@`
 	cp -r $< $@
-	install_name_tool -id "@loader_path/../$(FRAMEWORKS_DIR)/JSCocoa.framework/JSCocoa" "$@/JSCocoa"
-	install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" "$@/JSCocoa";
+	# install_name_tool -id "@loader_path/../$(FRAMEWORKS_DIR)/JSCocoa.framework/JSCocoa" "$@/JSCocoa"
+	# install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" "$@/JSCocoa";
 
 $(JSCOCOA_BUILD): $(JSCOCOA_CHECKOUT)
 	cd $(JSCOCOA_CHECKOUT)/JSCocoa && xcodebuild -project "JSCocoa (embed).xcodeproj"

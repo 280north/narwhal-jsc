@@ -607,7 +607,7 @@ FUNCTION(JILL_run, ARG_FN(app))
         
         int optval = 1;
         // don't signal SIGPIPE if a socket is closed early
-        setsockopt(client_socket, SOL_SOCKET, SO_NOSIGPIPE, (void *)&optval, sizeof(optval));
+        // setsockopt(client_socket, SOL_SOCKET, SO_NOSIGPIPE, (void *)&optval, sizeof(optval));
         
         client_data data;
         memset(&data, 0, sizeof(data));
