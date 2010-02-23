@@ -1,7 +1,14 @@
 #ifndef __NARWHAL__
 #define __NARWHAL__
 
+#include "config.h"
+
+#ifdef HAVE_JAVASCRIPT_H
 #include <JavaScriptCore/JavaScript.h>
+#else
+#include <JavaScriptCore/JavaScriptCore.h>
+#endif
+
 #include <dlfcn.h>
 #include <pthread.h>
 #include <stdio.h>

@@ -1,0 +1,12 @@
+echo "#include <JavaScriptCore/JavaScript.h>" > .check_JavaScript_h.h
+if gcc -E .check_JavaScript_h.h -framework JavaScriptCore &>/dev/null; then
+	echo '#define HAVE_JAVASCRIPT_H 1' > include/config.h
+	echo 'Detected <JavaScriptCore/JavaScript.h>'
+else 
+	echo '#ifdef HAVE_JAVASCRIPT_H' >  include/config.h
+	echo '#undef HAVE_JAVASCRIPT_H' >> include/config.h
+	echo '#endif' >> include/config.h
+	echo 'No <JavaScriptCore/JavaScript.h> detected. Using <JavaScriptCore/JavaScriptCore.h> instead.'
+fi
+rm -f .check_JavaScript_h.h
+

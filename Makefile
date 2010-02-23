@@ -33,11 +33,14 @@ JSCOCOA_BUILD=deps/JSCocoa/JSCocoa/build/Release/JSCocoa.framework
 JSCOCOA_CHECKOUT=deps/JSCocoa
 
 all: webkit webkit-debug jscore
-	
-jscore: 		bin/narwhal-jscore modules config-jscore
-webkit: 		bin/narwhal-webkit modules config-webkit
-webkit-debug:	bin/narwhal-webkit-debug modules config-webkit-debug
-jscocoa: 		frameworks-jscocoa bin/narwhal-jscocoa modules config-jscocoa
+
+config:
+	./configure
+
+jscore: 		config bin/narwhal-jscore modules config-jscore
+webkit: 		config bin/narwhal-webkit modules config-webkit
+webkit-debug:	config bin/narwhal-webkit-debug modules config-webkit-debug
+jscocoa: 		config frameworks-jscocoa bin/narwhal-jscocoa modules config-jscocoa
 
 
 lib/libnarwhal.dylib: narwhal.c
