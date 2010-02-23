@@ -35,7 +35,7 @@ JSCOCOA_CHECKOUT=deps/JSCocoa
 all: webkit webkit-debug jscore
 
 config:
-	./configure
+	sh configure
 
 jscore: 		config bin/narwhal-jscore modules config-jscore
 webkit: 		config bin/narwhal-webkit modules config-webkit
