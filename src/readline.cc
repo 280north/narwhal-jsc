@@ -27,6 +27,7 @@ END
 FUNCTION(READLINE_addHistory, ARG_UTF8(str))
 {
 	add_history(str);
+	return JS_null;
 }
 END
 
