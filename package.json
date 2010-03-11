@@ -1,9 +1,17 @@
 {
     "name": "narwhal-jsc",
-    "dependencies": ["narwhal"],
+    "dependencies": [
+        "narwhal"
+    ],
     "engine": "jsc",
     "author": "Tom Robinson (http://tlrobinson.net/)",
     "description": "JavaScriptCore engine support for Narwhal",
-    "keywords": ["narwhal", "engine", "jsc", "javascriptcore", "webkit"],
-    "version": "0.1.1"
+    "keywords": [
+        "narwhal",
+        "engine",
+        "jsc",
+        "javascriptcore",
+        "webkit"
+    ],
+    "version": "0.1.2"
 }
