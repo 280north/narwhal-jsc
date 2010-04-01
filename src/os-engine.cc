@@ -1,6 +1,7 @@
 #include <narwhal.h>
 
 #include <errno.h>
+#include <math.h>
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -23,13 +24,17 @@ FUNCTION(OS_exitImpl)
 }
 END
 
-FUNCTION(OS_sleep, ARG_INT(seconds))
+FUNCTION(OS_sleep, ARG_DOUBLE(seconds))
 {
-    // TODO: higher resolution sleep?
-    
-    while (seconds > 0)
-        seconds = sleep(seconds);
-    
+    struct timespec rmtp, rqtp;
+
+    rmtp.tv_sec = (long)floor(seconds);
+    rmtp.tv_nsec = (long)((seconds - ((double)rmtp.tv_sec)) * 1e9);
+
+    do {
+        rqtp = rmtp;
+    } while (nanosleep(&rqtp, &rmtp) < 0);
+
     return JS_undefined;
 }
 END
