@@ -11,9 +11,11 @@ FRAMEWORKS_DIR=frameworks
 
 LIB_DIR   =lib
 
+READLINE_FLAGS=-DUSE_READLINE -lreadline
+
 INCLUDES  =-Iinclude
 MODULES   =$(patsubst %.cc,%.dylib,$(patsubst src/%,lib/%,$(shell find src -name '*.cc')))
-LIBS      =-framework JavaScriptCore -L/usr/lib -lreadline -liconv -L$(LIB_DIR) -lnarwhal $(FRAMEWORKS)
+LIBS      =-framework JavaScriptCore -L/usr/lib -liconv -L$(LIB_DIR) -lnarwhal $(FRAMEWORKS) $(READLINE_FLAGS)
 
 SOURCE    =narwhal-jsc.c
 
@@ -44,7 +46,7 @@ jscocoa: 		config frameworks-jscocoa bin/narwhal-jscocoa modules config-jscocoa
 
 
 lib/libnarwhal.dylib: narwhal.c
-	$(CC) -o $@ $< -dynamiclib $(CPPFLAGS) $(INCLUDES) $(FRAMEWORKS) -framework JavaScriptCore -lreadline 
+	$(CC) -o $@ $< -dynamiclib $(CPPFLAGS) $(INCLUDES) $(FRAMEWORKS) -framework JavaScriptCore $(READLINE_FLAGS)
 
 bin/narwhal-jscore: $(SOURCE) lib/libnarwhal.dylib
 	mkdir -p `dirname $@`

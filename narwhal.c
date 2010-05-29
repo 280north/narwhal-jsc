@@ -2,8 +2,11 @@
 
 #include <narwhal.h>
 
+#ifdef USE_READLINE
+// #include <editline/readline.h>
 #include <readline/history.h>
 #include <readline/readline.h>
+#endif
 
 //#ifdef WEBKIT
 
@@ -196,6 +199,7 @@ void* RunREPL(JSContextRef _context) {
 #ifdef JSCOCOA
         NSAutoreleasePool *pool = [NSAutoreleasePool new];
 #endif
+#ifdef USE_READLINE
         char *str = readline("> ");
         if (str && *str)
             add_history(str);
@@ -205,6 +209,15 @@ void* RunREPL(JSContextRef _context) {
         
         JSStringRef source = JSStringCreateWithUTF8CString(str);
         free(str);
+#else
+        char str[1024*10];
+
+        printf("> ");
+        if (!fgets(str, sizeof(str), stdin))
+            break;
+
+        JSStringRef source = JSStringCreateWithUTF8CString(str);
+#endif
         
         EvaluateREPL(_context, source);
         
