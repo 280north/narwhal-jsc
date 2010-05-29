@@ -44,6 +44,7 @@
     var narwhal = evalGlobal(_read(prefix + "/narwhal.js") + "/**/" + sourceURLTag);
     narwhal.displayName = "narwhal";
     
+try {
     narwhal({
         global: global,
         evalGlobal: evalGlobal,
@@ -66,6 +67,11 @@
         debug: debug,
         verbose: verbose
     });
+} catch (e) {
+    if (e && (e.line || e.sourceURL))
+        print("Error on line " + (e.line || "[unknown]") + " of file " + (e.sourceURL || "[unknown]"));
+    throw e;
+}
     
     if (profiling) {
         _inspector.stopProfilingJavaScript_();
