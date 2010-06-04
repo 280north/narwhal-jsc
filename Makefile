@@ -11,11 +11,9 @@ FRAMEWORKS_DIR=frameworks
 
 LIB_DIR   =lib
 
-READLINE_FLAGS=-DUSE_READLINE -lreadline
-
 INCLUDES  =-Iinclude
 MODULES   =$(patsubst %.cc,%.dylib,$(patsubst src/%,lib/%,$(shell find src -name '*.cc')))
-LIBS      =-framework JavaScriptCore -L/usr/lib -liconv -L$(LIB_DIR) -lnarwhal $(FRAMEWORKS) $(READLINE_FLAGS)
+LIBS      =-framework JavaScriptCore -L/usr/lib -liconv -L$(LIB_DIR) -lnarwhal $(FRAMEWORKS)
 
 SOURCE    =narwhal-jsc.c
 
@@ -46,7 +44,7 @@ jscocoa: 		config frameworks-jscocoa bin/narwhal-jscocoa modules config-jscocoa
 
 
 lib/libnarwhal.dylib: narwhal.c
-	$(CC) -o $@ $< -dynamiclib $(CPPFLAGS) $(INCLUDES) $(FRAMEWORKS) -framework JavaScriptCore $(READLINE_FLAGS)
+	$(CC) -o $@ $< -dynamiclib $(CPPFLAGS) $(INCLUDES) $(FRAMEWORKS) -framework JavaScriptCore
 
 bin/narwhal-jscore: $(SOURCE) lib/libnarwhal.dylib
 	mkdir -p `dirname $@`
@@ -99,11 +97,17 @@ modules: $(MODULES) rewrite-lib-paths
 rewrite-lib-paths:
 	#find lib -name "*.dylib" \! -path "*.dSYM*" -exec install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" {} \;
 	find lib -name "*.dylib" \! -path "*.dSYM*" -exec install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" {} \;
-	
+
 lib/%.dylib: src/%.cc
 	mkdir -p `dirname $@`
 	$(CPP) -o $@ $< $(CPPFLAGS) $(INCLUDES) -dynamiclib $(LIBS)
 	#install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" "$@"
+
+lib/readline.dylib: src/readline.cc lib/libedit.dylib
+	mkdir -p `dirname $@`
+	$(CPP) -o $@ $< $(CPPFLAGS) $(INCLUDES) -dynamiclib $(LIBS) -DUSE_EDITLINE -Ideps/libedit-20100424-3.0/src -ledit
+	#install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" "$@"
+	install_name_tool -change "lib/libedit.dylib" "@executable_path/../lib/libedit.dylib" "$@"
 
 lib/jack/handler/jill.dylib: src/jack/handler/jill.cc deps/http-parser/http_parser.o lib/io-engine.dylib lib/binary-engine.dylib
 	mkdir -p `dirname $@`
@@ -115,7 +119,14 @@ lib/jack/handler/jill.dylib: src/jack/handler/jill.cc deps/http-parser/http_pars
 deps/http-parser/http_parser.o:
 	cd deps/http-parser && make http_parser.o
 
+deps/libedit-20100424-3.0/src/.libs/libedit.dylib: deps/libedit-20100424-3.0
+	cd deps/libedit-20100424-3.0 && \
+		env CFLAGS="-force_cpusubtype_ALL -mmacosx-version-min=10.4 -arch i386 -arch ppc" \
+		LDFLAGS="-force_cpusubtype_ALL -mmacosx-version-min=10.4 -arch i386 -arch ppc" ./configure --disable-dependency-tracking && \
+		make
 
+lib/libedit.dylib: deps/libedit-20100424-3.0/src/.libs/libedit.dylib
+	cp $< $@
 
 frameworks: $(JSCORE_FRAMEWORK)
 

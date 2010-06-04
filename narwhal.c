@@ -2,12 +2,6 @@
 
 #include <narwhal.h>
 
-#ifdef USE_READLINE
-// #include <editline/readline.h>
-#include <readline/history.h>
-#include <readline/readline.h>
-#endif
-
 //#ifdef WEBKIT
 
 JSObjectRef JSObjectMakeArray(JSContextRef _context, size_t argc, const JSValueRef argv[],  JSValueRef* _exception)
@@ -191,45 +185,6 @@ void* EvaluateREPL(JSContextRef _context, JSStringRef source)
     }
 }
 
-// The read-eval-execute loop of the shell.
-void* RunREPL(JSContextRef _context) {
-    printf("Narwhal version %s, JavaScriptCore engine\n", NARWHAL_VERSION);
-    while (true)
-    {
-#ifdef JSCOCOA
-        NSAutoreleasePool *pool = [NSAutoreleasePool new];
-#endif
-#ifdef USE_READLINE
-        char *str = readline("> ");
-        if (str && *str)
-            add_history(str);
-        
-        if (!str)
-            break;
-        
-        JSStringRef source = JSStringCreateWithUTF8CString(str);
-        free(str);
-#else
-        char str[1024*10];
-
-        printf("> ");
-        if (!fgets(str, sizeof(str), stdin))
-            break;
-
-        JSStringRef source = JSStringCreateWithUTF8CString(str);
-#endif
-        
-        EvaluateREPL(_context, source);
-        
-        JSStringRelease(source);
-        
-#ifdef JSCOCOA
-        [pool drain];
-#endif
-    }
-    printf("\n");
-}
-
 DESTRUCTOR(Context_finalize)
 {    
     GET_INTERNAL(ContextPrivate *, data, object);
@@ -386,16 +341,15 @@ JSValueRef narwhal_wrapped(JSGlobalContextRef _context, JSValueRef *_exception, 
     SET_VALUE(ENV, "NARWHAL_HOME",        JS_str_utf8(NARWHAL_HOME, strlen(NARWHAL_HOME)));
     SET_VALUE(ENV, "NARWHAL_ENGINE_HOME", JS_str_utf8(NARWHAL_ENGINE_HOME, strlen(NARWHAL_ENGINE_HOME)));
 
+    SET_VALUE(ENV, "NARWHAL_RUN_SHELL",   runShell ? JS_str_utf8("1", 1) : JS_str_utf8("0", 1));
+    SET_VALUE(ENV, "NARWHAL_VERSION",     JS_str_utf8(NARWHAL_VERSION, strlen(NARWHAL_VERSION)));
+
     JSObjectRef context = CALL(Context_new, _context);
     ARGS_ARRAY(init_args, context, ARGS, ENV);
 
     // HACK: call directly
     NW_inititialize(_context, NULL, NULL, 3, init_args, _exception);
     //CALL_AS_FUNCTION(JS_fn(NW_inititialize), JS_GLOBAL, 3, init_args);
-    
-    // TODO: move this to JS.
-    if (!*_exception && argc <= 1 && runShell)
-        RunREPL(_context);
 }
 
 int narwhal(JSGlobalContextRef _context, JSValueRef *_exception, int argc, char *argv[], char *envp[], int runShell)
