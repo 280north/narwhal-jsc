@@ -120,6 +120,7 @@ deps/http-parser/http_parser.o:
 	cd deps/http-parser && make http_parser.o
 
 deps/libedit-20100424-3.0/src/.libs/libedit.dylib: deps/libedit-20100424-3.0
+	chmod +x deps/libedit-20100424-3.0/configure
 	cd deps/libedit-20100424-3.0 && \
 		env CFLAGS="-force_cpusubtype_ALL -mmacosx-version-min=10.4 -arch i386 -arch ppc" \
 		LDFLAGS="-force_cpusubtype_ALL -mmacosx-version-min=10.4 -arch i386 -arch ppc" ./configure --disable-dependency-tracking && \
