@@ -7,7 +7,9 @@ test: http_parser.o test.c
 http_parser.o: http_parser.c http_parser.h Makefile
 	gcc $(OPT) -c http_parser.c
 
-http_parser.c: http_parser.rl Makefile
+# HACK: made this task manual since it was sometimes being run even if ragel wasn't installed, causing build to fail.
+# http_parser.c: http_parser.rl Makefile
+rerun-ragel:
 	ragel -s -G2 http_parser.rl -o $@
 
 tags: http_parser.rl http_parser.h test.c
