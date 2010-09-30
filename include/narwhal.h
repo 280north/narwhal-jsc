@@ -33,9 +33,9 @@ JSValueRef JSValueMakeStringWithUTF8CString(JSContextRef, const char *);
     (defined(__MIPS__) && defined(__MISPEB__)) || \
     defined(__ppc__) || defined(__POWERPC__) || defined(_M_PPC) || \
     defined(__sparc__)
-	#define UTF_16_ENCODING "UTF-16BE"
+	#define UTF_16_ENCODING "UTF-16BE//IGNORE"
 #else
-	#define UTF_16_ENCODING "UTF-16LE"
+	#define UTF_16_ENCODING "UTF-16LE//IGNORE"
 #endif
 
 //#define DEBUG_ON
