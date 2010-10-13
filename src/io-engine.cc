@@ -228,7 +228,7 @@ FUNCTION(TextInputStream_read)
         // if there's no data in the buffer, or it ends in the middle of a multibyte character, read more
         if (d->inBufferUsed == 0 || last_errno == EINVAL) {
             DEBUG("need more data, reading\n");
-            size_t num = read(fd, d->inBuffer + d->inBufferUsed, d->inBufferSize - d->inBufferUsed);
+            ssize_t num = read(fd, d->inBuffer + d->inBufferUsed, d->inBufferSize - d->inBufferUsed);
             if (num <= 0) {
                 DEBUG("couldn't read more, done reading for now\n");
                 break;
