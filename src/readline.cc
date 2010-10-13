@@ -38,7 +38,7 @@ FUNCTION(READLINE_addHistory, ARG_UTF8(str))
 {
 #if defined(USE_READLINE) || defined(USE_EDITLINE)
 	add_history(str);
-	return JS_null;
+	return JS_undefined;
 #else
     THROW("Not compiled with readline or editline support.")
 #endif
