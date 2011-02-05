@@ -185,13 +185,20 @@ int transcode(char *src, size_t srcLength, char **dstOut, size_t *dstLengthOut, 
     }
 
     char *src_buf = src, *dst_buf = dst;
+    
+#ifdef ICONV_REQUIRES_CONST_POINTER
+    const char **src_buf_ptr = &src_buf;
+#else
+    char **src_buf_ptr = &src_buf;
+#endif
+
     size_t src_bytes_left = (size_t)srcLength, dst_bytes_left = (size_t)dst_length, converted=0;
 
     while (dst_bytes_left > 0)
     {
         if (src_bytes_left == 0)
             break;
-        if ((converted = iconv(cd, &src_buf, &src_bytes_left, &dst_buf, &dst_bytes_left)) == (size_t)-1)
+        if ((converted = iconv(cd, src_buf_ptr, &src_bytes_left, &dst_buf, &dst_bytes_left)) == (size_t)-1)
         {
             if (errno != EINVAL)
             {

@@ -1,12 +1,12 @@
-echo "#include <JavaScriptCore/JavaScript.h>" > .check_JavaScript_h.h
-if gcc -E .check_JavaScript_h.h -framework JavaScriptCore &>/dev/null; then
-	echo '#define HAVE_JAVASCRIPT_H 1' > include/config.h
-	echo 'Detected <JavaScriptCore/JavaScript.h>'
+if echo "#include <JavaScriptCore/JavaScript.h>" | cpp &> /dev/null; then
+    echo "#define HAVE_JAVASCRIPT_H" > include/config.h
 else 
-	echo '#ifdef HAVE_JAVASCRIPT_H' >  include/config.h
-	echo '#undef HAVE_JAVASCRIPT_H' >> include/config.h
-	echo '#endif' >> include/config.h
-	echo 'No <JavaScriptCore/JavaScript.h> detected. Using <JavaScriptCore/JavaScriptCore.h> instead.'
+    echo "#undef HAVE_JAVASCRIPT_H" > include/config.h
 fi
-rm -f .check_JavaScript_h.h
 
+if echo "#include <iconv.h>" | cpp | egrep -C2 "size_t[\w]+iconv" |\
+  tr -d "\n" | egrep "const[\w]+char" &> /dev/null; then
+    echo "#define ICONV_REQUIRES_CONST_POINTER" > include/config.h
+else
+    echo "#undef ICONV_REQUIRES_CONST_POINTER" > include/config.h
+fi
