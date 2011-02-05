@@ -158,9 +158,9 @@ $(JSCOCOA_CHECKOUT):
 clean:
 	find lib -name "*.dylib" -exec rm -rf {} \;
 	rm -rf bin/narwhal-jscore* bin/narwhal-webkit* bin/*.dylib bin/*.dSYM lib/*.dylib lib/*.dSYM *.o *.ii *.s
-	cd deps/http-parser && make clean
 
 cleaner: clean
+	cd deps/http-parser && make clean
 	rm -rf $(JSCORE_FRAMEWORK) $(JSCOCOA_FRAMEWORK) $(JSCORE_BUILD) $(JSCOCOA_BUILD)
 
 pristine: cleaner
