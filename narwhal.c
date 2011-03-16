@@ -1,6 +1,7 @@
 #define NOTRACE
 
 #include <narwhal.h>
+#include <libgen.h>
 
 //#ifdef WEBKIT
 
@@ -322,6 +323,7 @@ JSValueRef narwhal_wrapped(JSGlobalContextRef _context, JSValueRef *_exception, 
         // glibc's dirname modifies it's argument so copy first
         char tmp[1024];
         strcpy(tmp, executable);
+	char * foo = (char *)dirname(tmp);
         strcpy(NARWHAL_ENGINE_HOME, (char *)dirname((char *)dirname(tmp)));
     }
 
