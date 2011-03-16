@@ -16,7 +16,7 @@ tags: http_parser.rl http_parser.h test.c
 	ctags $^
 
 clean:
-	rm -f *.o http_parser.c test http_parser.tar
+	rm -f *.o test http_parser.tar
 
 package: http_parser.c
 	@rm -rf /tmp/http_parser && mkdir /tmp/http_parser && \
