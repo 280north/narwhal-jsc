@@ -17,20 +17,27 @@ fi
 if [ -d "/System/Library/Frameworks" ]; then
 
     echo "Configuring for Mac OS X"
-    PLATFORM=Mac OS X
+
+    PLATFORM="Mac OS X"
+    CFLAGS="$CFLAGS -force_cpusubtype_ALL -mmacosx-version-min=10.4 -arch i386"
     SO_EXT=dylib
     SO_CFLAGS=
-    SO_LFLAGS=-dynamic
+    SO_LFLAGS='-dynamiclib -Wl,-install_name,`basename $@`'
     JSCORE_CFLAGS=
-    JSCORE_LFLAGS=-framework JavaScriptCore
-    WEBKIT_CFLAGS=-DWEBKIT -x objective-c
-    WEBKIT_LFLAGS=-framework Foundation -framework WebKit
+    JSCORE_LFLAGS="-framework JavaScriptCore"
+    WEBKIT_CFLAGS="-DWEBKIT -x objective-c"
+    WEBKIT_LFLAGS="-framework Foundation -framework WebKit -framework JavaScriptCore"
+
+    if [ -d "frameworks" ]; then
+        echo "Looking for frameworks in ./frameworks"
+        LFLAGS="$LFLAGS -F./frameworks"
+    fi
 
 elif pkg-config --version >/dev/null 2>&1; then
 
     echo "Configuring with pkg-config"
 
-    for config in webkitgtk-3.0 webkit-1.0;
+    for config in webkitgtk-3.0 webkit-3.0 webkitgtk-1.0 webkit-1.0;
     do
         if pkg-config --modversion $config >/dev/null 2>&1; then
             PLATFORM=$config
@@ -39,6 +46,17 @@ elif pkg-config --version >/dev/null 2>&1; then
             WEBKIT_CFLAGS="-DWEBKIT_GTK ${JSCORE_CFLAGS}"
             WEBKIT_LFLAGS=${JSCORE_LFLAGS}
             break
+        fi
+
+        if [ "$PLATFORM" = "unknown" ]; then
+            echo
+            echo "ERROR: can't find webkit on your system"
+            echo
+            echo "On Debian-based systems, try: apt-get install libwebkitgtk-3.0-dev"
+            echo
+            echo "If that doesn't work, try: pkg-config --list-all | grep webkit"
+            echo "and add it to list of configs here"
+            exit 1
         fi
     done
 else
@@ -75,3 +93,4 @@ do
     echo "${flag}=${value}" >> config.mk
 done
 
+exit 0
