@@ -31,13 +31,9 @@ int main(int argc, char *argv[], char *envp[])
         JSCocoaController *jsc = [JSCocoa new];
         JSGlobalContextRef _context = [jsc ctx];
     #elif defined(WEBKIT_GTK)
-
 	gtk_init(0, NULL);
-
-        WebKitWebView*view = webkit_web_view_new();
- 
+        WebKitWebView* view = webkit_web_view_new();
         WebKitWebFrame* frame = webkit_web_view_get_main_frame(view);
-
         JSGlobalContextRef _context = 
              webkit_web_frame_get_global_context(frame);
     #else
