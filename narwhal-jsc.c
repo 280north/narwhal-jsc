@@ -12,6 +12,8 @@
 #import <AppKit/AppKit.h>
 #import <WebKit/WebKit.h>
 #import "NWDebug.h"
+#elif WEBKIT_GTK
+#include "webkit/webkitwebview.h"
 #endif
 
 int main(int argc, char *argv[], char *envp[])
@@ -28,6 +30,16 @@ int main(int argc, char *argv[], char *envp[])
         NSAutoreleasePool *pool = [NSAutoreleasePool new];
         JSCocoaController *jsc = [JSCocoa new];
         JSGlobalContextRef _context = [jsc ctx];
+    #elif defined(WEBKIT_GTK)
+
+	gtk_init(0, NULL);
+
+        WebKitWebView*view = webkit_web_view_new();
+ 
+        WebKitWebFrame* frame = webkit_web_view_get_main_frame(view);
+
+        JSGlobalContextRef _context = 
+             webkit_web_frame_get_global_context(frame);
     #else
         JSGlobalContextRef _context = JSGlobalContextCreate(NULL);
     #endif
