@@ -50,7 +50,7 @@
     narwhal.displayName = "narwhal";
 
     try {
-        narwhal({
+        var config = {
             global: global,
             evalGlobal: evalGlobal,
             engine: 'jsc',
@@ -67,11 +67,13 @@
                 read: function read(path) { return _read(path); },
                 isFile: function isFile(path) { return _isFile(path); }
             },
-            loaders: [[".dylib", NativeLoader()]],
+            loaders: [[".so", NativeLoader()],[".dylib",NativeLoader()]],
             os : "darwin",
             debug: debug,
             verbose: verbose
-        });
+        };
+
+        narwhal(config);
 
     } catch (e) {
         if (e && (e.line || e.sourceURL))
