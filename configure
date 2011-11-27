@@ -63,13 +63,13 @@ elif pkg-config --version >/dev/null 2>&1; then
     done
 else
 
-    echo "Guessing config... this might not work"
+    echo "Guessing config... this probably won't work!"
 
     PLATFORM=generic
     JSCORE_CFLAGS=-I/usr/local/include/webkit
     JSCORE_LFLAGS=-L/usr/local/lib -lwebkit
     WEBKIT_CFLAGS=${JSCORE_CFLAGS}
-    WEBKIT_LFLAGS=${JSCORE_LIBS}
+    WEBKIT_LFLAGS=${JSCORE_LFLAGS}
 fi
 
 
