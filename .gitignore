@@ -11,3 +11,4 @@ frameworks
 .DS_Store
 narwhal-jsc.conf
 include/config.h
+config.mk
