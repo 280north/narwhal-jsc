@@ -150,7 +150,7 @@ deps/libedit-20100424-3.0/src/.libs/libedit.$(SO_EXT): deps/libedit-20100424-3.0
 		make
 
 lib/libedit.$(SO_EXT): deps/libedit-20100424-3.0/src/.libs/libedit.$(SO_EXT)
-	cp $< $@
+	cp -a $<* lib/
 
 frameworks: $(JSCORE_FRAMEWORK)
 
