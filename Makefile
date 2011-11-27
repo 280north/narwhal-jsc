@@ -1,33 +1,4 @@
 
-#CPP       =g++
-#CC        =gcc
-
-#CFLAGS  = -0s -force_cpusubtype_ALL -mmacosx-version-min=10.4 -arch i386
-#CFLAGS  = -Os 
-#CFLAGS += -g -O0
-#CFLAGS += -DDEBUG_ON
-#CFLAGS += -save-temps
-
-#LIBS_JSCORE = -framework JavaScriptCore
-
-#WEBKIT_PKGCONFIG=webkit-1.0
-#WEBKIT_PKGCONFIG=webkitgtk-3.0
-
-#LIBS_JSCORE = `pkg-config --libs $(WEBKIT_PKGCONFIG)`
-
-#LIBS_WEBKIT = -framework Foundation -framework WebKit
-#LIBS_WEBKIT = `pkg-config --libs $(WEBKIT_PKGCONFIG)`
-
-#SO_LFLAGS = -dynamiclib
-#SO_LFLAGS = -fPIC -shared
-
-#FRAMEWORKS_DIR=frameworks
-#FRAMEWORKS=-Fframeworks
-#FRAMEWORKS=-F/Users/tlrobinson/code/WebKit/WebKitBuild/Release/
-
-#SO_EXT=dylib
-#SO_EXT=so
-
 include config.mk
 
 LIB_DIR   =lib
@@ -70,87 +41,77 @@ lib/libnarwhal.$(SO_EXT): narwhal.c
 bin/narwhal-jscore: $(SOURCE) lib/libnarwhal.$(SO_EXT)
 	mkdir -p `dirname $@`
 	$(CC) -o $@ $(SOURCE) $(CFLAGS) $(LFLAGS) $(JSCORE_CFLAGS) $(JSCORE_LFLAGS)
-	#install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$@"
 
 bin/narwhal-webkit: $(SOURCE) lib/libnarwhal.$(SO_EXT)
 	mkdir -p `dirname $@`
 	#$(CC) -o $@ -x objective-c $(SOURCE) $(CFLAGS) $(INCLUDES) $(LIBS) $(LIBS_WEBKIT) 
-	$(CC) -o $@ $(SOURCE) $(CFLAGS) $(LFLAGS) $(WEBKIT_CFLAGS) $(WEBKIT_LFLAGS) 
-	#install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$@"
+	$(CC) -o $@ $(CFLAGS) $(WEBKIT_CFLAGS) $(SOURCE) $(LFLAGS) $(WEBKIT_LFLAGS) 
 
 bin/narwhal-webkit-debug: $(SOURCE) NWDebug.m lib/libnarwhal.$(SO_EXT)
 	mkdir -p `dirname $@`
 	$(CC) -o $@ -DWEBKIT_DEBUG -x objective-c $(SOURCE) NWDebug.m $(CFLAGS) $(INCLUDES) $(LIBS) \
 		-framework Foundation -framework WebKit \
 		-framework AppKit -sectcreate __TEXT __info_plist Info.plist
-	#install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$@"
 
 bin/narwhal-jscocoa: $(SOURCE) lib/libnarwhal.$(SO_EXT)
 	mkdir -p `dirname $@`
 	$(CC) -o $@ -DJSCOCOA -x objective-c $(SOURCE) $(CFLAGS) $(INCLUDES) $(LIBS) \
 		-framework Foundation -framework WebKit \
 		-framework JSCocoa
-	#install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" "$@"
-
-
 config-jscore:
 	echo 'export NARWHAL_JSC_MODE="jscore"' > narwhal-jsc.conf
-	# rm -f bin/narwhal-jsc
-	# ln -s narwhal-jscore bin/narwhal-jsc
 
 config-webkit:
 	echo 'export NARWHAL_JSC_MODE="webkit"' > narwhal-jsc.conf
-	# rm -f bin/narwhal-jsc
-	# ln -s narwhal-webkit bin/narwhal-jsc
 
 config-webkit-debug:
 	echo 'export NARWHAL_JSC_MODE="webkit-debug"' > narwhal-jsc.conf
-	# rm -f bin/narwhal-jsc
-	# ln -s narwhal-webkit-debug bin/narwhal-jsc
 
 config-jscocoa: 
 	echo 'export NARWHAL_JSC_MODE="jscocoa"' > narwhal-jsc.conf
-	# rm -f bin/narwhal-jsc
-	# ln -s narwhal-jscocoa bin/narwhal-jsc
 
-modules: $(MODULES) rewrite-lib-paths
+modules: $(MODULES) 
 
 rewrite-lib-paths:
-	#find lib -name "*.$(SO_EXT)" \! -path "*.dSYM*" -exec install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" {} \;
-	#find lib -name "*.$(SO_EXT)" \! -path "*.dSYM*" -exec install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" {} \;
+	find lib -name "*.$(SO_EXT)" \! -path "*.dSYM*" -exec install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" {} \;
+	find lib -name "*.$(SO_EXT)" \! -path "*.dSYM*" -exec install_name_tool -change "$(ABSOLUTE_LIBNARWHAL)" "$(RELATIVE_LIBNARWHAL)" {} \;
 
 lib/%.$(SO_EXT): src/%.cc
 	mkdir -p `dirname $@`
 	$(CPP) -o $@ $< $(CFLAGS) $(SO_CFLAGS) $(JSCORE_CFLAGS) $(SO_LFLAGS) $(LFLAGS) $(JSCORE_LFLAGS)
 	#install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" "$@"
 
-lib/readline.$(SO_EXT): src/readline.cc lib/libedit.so
+lib/readline.$(SO_EXT): src/readline.cc lib/libedit.$(SO_EXT)
 	mkdir -p `dirname $@`
-	$(CPP) -o $@ $< $(CFLAGS) $(SO_CFLAGS) $(SO_LFLAGS) $(LFLAGS) $(JSCORE_CFLAGS) $(JSCORE_LFLAGS) -DUSE_EDITLINE -Ideps/libedit-20100424-3.0/src -ledit
-	#install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" "$@"
-	#install_name_tool -change "lib/libedit.$(SO_EXT)" "@executable_path/../lib/libedit.dylib" "$@"
+	$(CPP) -o $@ $< $(CFLAGS) -Wl,-install_name,`basename $@` $(SO_CFLAGS) $(SO_LFLAGS) $(LFLAGS) $(JSCORE_CFLAGS) $(JSCORE_LFLAGS) -DUSE_EDITLINE -Ideps/libedit-20100424-3.0/src -ledit
 
 lib/jack/handler/jill.$(SO_EXT): src/jack/handler/jill.cc deps/http-parser/http_parser.o lib/io-engine.$(SO_EXT) lib/binary-engine.$(SO_EXT)
 	mkdir -p `dirname $@`
-	$(CPP) -o $@ $< $(CFLAGS) $(SO_CFLAGS) $(SO_LFLAGS) $(LIBS) $(JSCORE_CFLAGS) $(JSCORE_LFLAGS) deps/http-parser/http_parser.o lib/io-engine.$(SO_EXT) lib/binary-engine.$(SO_EXT)
-	#install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" "$@"
-	#install_name_tool -change "lib/io-engine.$(SO_EXT)" "@executable_path/../lib/io-engine.dylib" "$@"
-	#install_name_tool -change "lib/binary-engine.$(SO_EXT)" "@executable_path/../lib/binary-engine.dylib" "$@"
+	$(CPP) -o $@ $< $(CFLAGS) $(SO_CFLAGS) $(SO_LFLAGS) $(JSCORE_CFLAGS) $(LFLAGS) $(JSCORE_LFLAGS) deps/http-parser/http_parser.o lib/io-engine.$(SO_EXT) lib/binary-engine.$(SO_EXT)
 
 deps/http-parser/http_parser.o:
 	cd deps/http-parser && make http_parser.o
 
 deps/libedit-20100424-3.0/src/.libs/libedit.$(SO_EXT): deps/libedit-20100424-3.0
 	chmod +x deps/libedit-20100424-3.0/configure
-	cd deps/libedit-20100424-3.0 && \
-		aclocal && \
-                libtoolize && \
-                autoconf && \
-                ./configure --disable-static --enable-shared --disable-dependency-tracking && \
-		make
+	if [ "$(PLATFORM)" = "Mac OS X" ]; then \
+	  (cd deps/libedit-20100424-3.0 && \
+	  env CFLAGS="$(CFLAGS)" \
+	     LDFLAGS="$(CFLAGS)" \
+	     ./configure --disable-static --enable-shared --disable-dependency-tracking && \
+	  make) \
+	else \
+	  (cd deps/libedit-20100424-3.0 && \
+	  aclocal && \
+      libtoolize && \
+      autoconf && \
+      ./configure --disable-static --enable-shared --disable-dependency-tracking && \
+	 make) \
+	 fi
 
 lib/libedit.$(SO_EXT): deps/libedit-20100424-3.0/src/.libs/libedit.$(SO_EXT)
-	cp -a $<* lib/
+	rm -rf lib/libedit*
+	cp -a deps/libedit-20100424-3.0/src/.libs/libedit*.$(SO_EXT)* lib/
 
 frameworks: $(JSCORE_FRAMEWORK)
 
@@ -181,7 +142,7 @@ $(JSCOCOA_CHECKOUT):
 
 clean:
 	find lib -name "*.$(SO_EXT)" -exec rm -rf {} \;
-	rm -rf bin/narwhal-jscore* bin/narwhal-webkit* bin/*.$(SO_EXT) bin/*.dSYM lib/*.dSYM *.ii *.s
+	rm -rf bin/narwhal-jscore* bin/narwhal-webkit* bin/*.$(SO_EXT)* bin/*.dSYM lib/*.dSYM *.ii *.s
 
 cleaner: clean
 	cd deps/http-parser && make clean
