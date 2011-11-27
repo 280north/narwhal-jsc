@@ -607,8 +607,12 @@ FUNCTION(JILL_run, ARG_FN(app))
         
         int optval = 1;
         // don't signal SIGPIPE if a socket is closed early
+
+	// FIXME: what is the linux equivalent?
+#ifdef __APPLE__
         setsockopt(client_socket, SOL_SOCKET, SO_NOSIGPIPE, (void *)&optval, sizeof(optval));
-        
+#endif
+
         client_data data;
         memset(&data, 0, sizeof(data));
         data.base = buffer;
