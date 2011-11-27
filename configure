@@ -1,5 +1,60 @@
+#!/bin/sh
+
+PLATFORM=unknown
+CC=gcc
+CPP=g++
+CFLAGS=-Os
+LFLAGS=
+SO_EXT=so
+SO_CFLAGS=-fPIC
+SO_LFLAGS=-shared
+
+if colorgcc -v >/dev/null 2>&1; then
+    CC=colorgcc
+    CPP=colorgcc
+fi
+
+if [ -d "/System/Library/Frameworks" ]; then
+
+    echo "Configuring for Mac OS X"
+    PLATFORM=Mac OS X
+    SO_EXT=dylib
+    SO_CFLAGS=
+    SO_LFLAGS=-dynamic
+    JSCORE_CFLAGS=
+    JSCORE_LFLAGS=-framework JavaScriptCore
+    WEBKIT_CFLAGS=-DWEBKIT -x objective-c
+    WEBKIT_LFLAGS=-framework Foundation -framework WebKit
+
+elif pkg-config --version >/dev/null 2>&1; then
+
+    echo "Configuring with pkg-config"
+
+    for config in webkitgtk-3.0 webkit-1.0;
+    do
+        if pkg-config --modversion $config >/dev/null 2>&1; then
+            PLATFORM=$config
+            JSCORE_CFLAGS=`pkg-config --cflags $config`
+            JSCORE_LFLAGS=`pkg-config --libs $config`
+            WEBKIT_CFLAGS="-DWEBKIT_GTK ${JSCORE_CFLAGS}"
+            WEBKIT_LFLAGS=${JSCORE_LFLAGS}
+            break
+        fi
+    done
+else
+
+    echo "Guessing config... this might not work"
+    PLATFORM=unknown
+    JSCORE_CFLAGS=-I/usr/local/include/webkit
+    JSCORE_LFLAGS=-L/usr/local/lib -lwebkit
+    WEBKIT_CFLAGS=${JSCORE_CFLAGS}
+    WEBKIT_LFLAGS=${JSCORE_LIBS}
+fi
+
+
 echo "#include <JavaScriptCore/JavaScript.h>" > .check_JavaScript_h.h
-if gcc -E .check_JavaScript_h.h -framework JavaScriptCore &>/dev/null; then
+#if gcc -E .check_JavaScript_h.h -framework JavaScriptCore &>/dev/null; then
+if ${CC} ${JSCORE_CFLAGS} ${JSCORE_LIBS} -E .check_JavaScript_h.h  >/dev/null 2>&1; then
 	echo '#define HAVE_JAVASCRIPT_H 1' > include/config.h
 	echo 'Detected <JavaScriptCore/JavaScript.h>'
 else 
@@ -9,4 +64,14 @@ else
 	echo 'No <JavaScriptCore/JavaScript.h> detected. Using <JavaScriptCore/JavaScriptCore.h> instead.'
 fi
 rm -f .check_JavaScript_h.h
+
+echo PLATFORM=${PLATFORM} > config.mk
+for flag in CC CPP CFLAGS LFLAGS \
+     SO_EXT SO_CFLAGS SO_LFLAGS \
+     JSCORE_CFLAGS JSCORE_LFLAGS \
+     WEBKIT_CFLAGS WEBKIT_LFLAGS;
+do
+    eval "value=\${${flag}}"
+    echo "${flag}=${value}" >> config.mk
+done
 
