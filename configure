@@ -40,6 +40,7 @@ elif pkg-config --version >/dev/null 2>&1; then
     for config in webkitgtk-3.0 webkit-3.0 webkitgtk-1.0 webkit-1.0;
     do
         if pkg-config --modversion $config >/dev/null 2>&1; then
+            echo "Found $config"
             PLATFORM=$config
             JSCORE_CFLAGS=`pkg-config --cflags $config`
             JSCORE_LFLAGS=`pkg-config --libs $config`
@@ -50,19 +51,21 @@ elif pkg-config --version >/dev/null 2>&1; then
 
         if [ "$PLATFORM" = "unknown" ]; then
             echo
-            echo "ERROR: can't find webkit on your system"
+            echo "ERROR: can't find webkit on your system!"
             echo
             echo "On Debian-based systems, try: apt-get install libwebkitgtk-3.0-dev"
             echo
             echo "If that doesn't work, try: pkg-config --list-all | grep webkit"
             echo "and add it to list of configs here"
+            echo
             exit 1
         fi
     done
 else
 
     echo "Guessing config... this might not work"
-    PLATFORM=unknown
+
+    PLATFORM=generic
     JSCORE_CFLAGS=-I/usr/local/include/webkit
     JSCORE_LFLAGS=-L/usr/local/lib -lwebkit
     WEBKIT_CFLAGS=${JSCORE_CFLAGS}
@@ -83,6 +86,7 @@ else
 fi
 rm -f .check_JavaScript_h.h
 
+echo "writing config.mk"
 echo PLATFORM=${PLATFORM} > config.mk
 for flag in CC CPP CFLAGS LFLAGS \
      SO_EXT SO_CFLAGS SO_LFLAGS \

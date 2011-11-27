@@ -79,11 +79,10 @@ rewrite-lib-paths:
 lib/%.$(SO_EXT): src/%.cc
 	mkdir -p `dirname $@`
 	$(CPP) -o $@ $< $(CFLAGS) $(SO_CFLAGS) $(JSCORE_CFLAGS) $(SO_LFLAGS) $(LFLAGS) $(JSCORE_LFLAGS)
-	#install_name_tool -change "$(SYSTEM_JSC)" "$(RELATIVE_JSC)" "$@"
 
 lib/readline.$(SO_EXT): src/readline.cc lib/libedit.$(SO_EXT)
 	mkdir -p `dirname $@`
-	$(CPP) -o $@ $< $(CFLAGS) -Wl,-install_name,`basename $@` $(SO_CFLAGS) $(SO_LFLAGS) $(LFLAGS) $(JSCORE_CFLAGS) $(JSCORE_LFLAGS) -DUSE_EDITLINE -Ideps/libedit-20100424-3.0/src -ledit
+	$(CPP) -o $@ $< $(CFLAGS) $(SO_CFLAGS) $(SO_LFLAGS) $(LFLAGS) $(JSCORE_CFLAGS) $(JSCORE_LFLAGS) -DUSE_EDITLINE -Ideps/libedit-20100424-3.0/src -ledit
 
 lib/jack/handler/jill.$(SO_EXT): src/jack/handler/jill.cc deps/http-parser/http_parser.o lib/io-engine.$(SO_EXT) lib/binary-engine.$(SO_EXT)
 	mkdir -p `dirname $@`
@@ -142,7 +141,7 @@ $(JSCOCOA_CHECKOUT):
 
 clean:
 	find lib -name "*.$(SO_EXT)" -exec rm -rf {} \;
-	rm -rf bin/narwhal-jscore* bin/narwhal-webkit* bin/*.$(SO_EXT)* bin/*.dSYM lib/*.dSYM *.ii *.s
+	rm -rf bin/narwhal-jscore* bin/narwhal-webkit* bin/*.$(SO_EXT)* bin/*.dSYM lib/*.dSYM lib/libedit* *.ii *.s
 
 cleaner: clean
 	cd deps/http-parser && make clean
