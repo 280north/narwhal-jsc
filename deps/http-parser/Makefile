@@ -1,8 +1,8 @@
 
 include ../../config.mk
 
-#OPT=-O0 -g -Wall -Wextra -force_cpusubtype_ALL -mmacosx-version-min=10.4 -arch i386 #-Werror
-#OPT=-O2
+OPT=-O0 -g -Wall -Wextra #-force_cpusubtype_ALL -mmacosx-version-min=10.4 -arch i386 #-Werror
+# OPT=-O2
 
 OPT=-O0 -g -Wall -Wextra ${CFLAGS} ${SO_CFLAGS}
 

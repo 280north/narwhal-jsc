@@ -196,32 +196,32 @@ NWValue handlerWrapper(
     HANDLE_EXCEPTION(true, true);
     
     // REQUEST_METHOD
-    char *methodName = "GET";
+    char *methodName = (char *)"GET";
     switch (parser->method) {
-        case HTTP_COPY      : methodName = "COPY"; break;
-        case HTTP_DELETE    : methodName = "DELETE"; break;
-        case HTTP_HEAD      : methodName = "HEAD"; break;
-        case HTTP_LOCK      : methodName = "LOCK"; break;
-        case HTTP_MKCOL     : methodName = "MKCOL"; break;
-        case HTTP_MOVE      : methodName = "MOVE"; break;
-        case HTTP_OPTIONS   : methodName = "OPTIONS"; break;
-        case HTTP_POST      : methodName = "POST"; break;
-        case HTTP_PROPFIND  : methodName = "PROPFIND"; break;
-        case HTTP_PROPPATCH : methodName = "PROPPATCH"; break;
-        case HTTP_PUT       : methodName = "PUT"; break;
-        case HTTP_TRACE     : methodName = "TRACE"; break;
-        case HTTP_UNLOCK    : methodName = "UNLOCK"; break;
-        case HTTP_GET       : methodName = "GET"; break;
+        case HTTP_COPY      : methodName = (char *)"COPY"; break;
+        case HTTP_DELETE    : methodName = (char *)"DELETE"; break;
+        case HTTP_HEAD      : methodName = (char *)"HEAD"; break;
+        case HTTP_LOCK      : methodName = (char *)"LOCK"; break;
+        case HTTP_MKCOL     : methodName = (char *)"MKCOL"; break;
+        case HTTP_MOVE      : methodName = (char *)"MOVE"; break;
+        case HTTP_OPTIONS   : methodName = (char *)"OPTIONS"; break;
+        case HTTP_POST      : methodName = (char *)"POST"; break;
+        case HTTP_PROPFIND  : methodName = (char *)"PROPFIND"; break;
+        case HTTP_PROPPATCH : methodName = (char *)"PROPPATCH"; break;
+        case HTTP_PUT       : methodName = (char *)"PUT"; break;
+        case HTTP_TRACE     : methodName = (char *)"TRACE"; break;
+        case HTTP_UNLOCK    : methodName = (char *)"UNLOCK"; break;
+        case HTTP_GET       : methodName = (char *)"GET"; break;
     }
     SET_VALUE(env, "REQUEST_METHOD", JS_str_utf8(methodName, strlen(methodName)));
     HANDLE_EXCEPTION(true, true);
     
     // SERVER_PROTOCOL
-    char *versionName = "HTTP/1.1";
+    char *versionName = (char *)"HTTP/1.1";
     switch (parser->version) {
-        case HTTP_VERSION_09    : versionName = "HTTP/0.9"; break;
-        case HTTP_VERSION_10    : versionName = "HTTP/1.0"; break;
-        case HTTP_VERSION_11    : versionName = "HTTP/1.1"; break;
+        case HTTP_VERSION_09    : versionName = (char *)"HTTP/0.9"; break;
+        case HTTP_VERSION_10    : versionName = (char *)"HTTP/1.0"; break;
+        case HTTP_VERSION_11    : versionName = (char *)"HTTP/1.1"; break;
     }
     SET_VALUE(env, "SERVER_PROTOCOL", JS_str_utf8(versionName, strlen(versionName)));
     HANDLE_EXCEPTION(true, true);
@@ -262,7 +262,7 @@ NWValue handlerWrapper(
     ssize_t bodyLen = 0;
     // jsgi.input
     if (data->bodyOff < 0) {
-        body = "";
+        body = (char *)"";
         bodyLen = 0;
     } else {
         body = data->base + data->bodyOff;
@@ -338,7 +338,7 @@ NWValue handlerWrapper(
     int status = GET_INT(result, "status");
     HANDLE_EXCEPTION(true, true);
     
-    char *reason = "OK"; // FIXME
+    char *reason = (char *)"OK"; // FIXME
     snprintf(buffer, sizeof(buffer), "%s %d %s\r\n", "HTTP/1.1", status, reason);
     if (send(data->fd, buffer, strlen(buffer), 0) < 0)
         THROW("Client closed connection");
@@ -648,12 +648,12 @@ FUNCTION(JILL_run, ARG_FN(app))
             
             if (bufferPosition >= bufferSize) {
                 if (bufferPosition > bufferSize) {
-                    fprintf(stderr, "bufferPosition=%d bufferSize=%d WHAT?!\n", bufferPosition, bufferSize);
+                    fprintf(stderr, "bufferPosition=%u bufferSize=%u WHAT?!\n", (unsigned int)bufferPosition, (unsigned int)bufferSize);
                 } 
                 
                 bufferSize *= 2;
                 
-                fprintf(stderr, "reallocing bufferSize=%d\n", bufferSize);
+                fprintf(stderr, "reallocing bufferSize=%u\n", (unsigned int)bufferSize);
                 
                 data.base = buffer = (char *)realloc(buffer, bufferSize);
                 if (!data.base) {

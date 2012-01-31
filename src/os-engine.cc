@@ -154,8 +154,8 @@ FUNCTION(OS_popenImpl, ARG_UTF8(command))
         
         
         char *argv[] = {
-            "/bin/sh",
-            "-c",
+            (char *)"/bin/sh",
+            (char *)"-c",
             command,
             NULL
         };

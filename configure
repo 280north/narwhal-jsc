@@ -1,100 +1,84 @@
 #!/bin/sh
 
-PLATFORM=unknown
-CC=gcc
-CPP=g++
-CFLAGS=-Os
-LFLAGS=
-SO_EXT=so
-SO_CFLAGS=-fPIC
-SO_LFLAGS=-shared
+set -e
+set -u
 
-if colorgcc -v >/dev/null 2>&1; then
-    CC=colorgcc
-    CPP=colorgcc
-fi
+PLATFORM=""
 
-if [ -d "/System/Library/Frameworks" ]; then
+CC="gcc"
+CPP="g++"
+CFLAGS="-Os -Werror"
+LFLAGS=""
+SO_EXT="so"
+SO_CFLAGS="-fPIC"
+SO_LFLAGS="-shared"
+JSCORE_CFLAGS=""
+JSCORE_LFLAGS=""
+READLINE_CFLAGS=""
+READLINE_LFLAGS=""
+ICONV_CFLAGS=""
+ICONV_LFLAGS=""
 
-    echo "Configuring for Mac OS X"
+CONFIG_MK="config.mk"
+CONFIG_FLAGS="PLATFORM CC CPP CFLAGS LFLAGS SO_EXT SO_CFLAGS SO_LFLAGS JSCORE_CFLAGS JSCORE_LFLAGS READLINE_CFLAGS READLINE_LFLAGS ICONV_CFLAGS ICONV_LFLAGS"
 
-    PLATFORM="Mac OS X"
+if [ "$(uname)" = "Darwin" ]; then
+
+    PLATFORM="cocoa"
     CFLAGS="$CFLAGS -force_cpusubtype_ALL -mmacosx-version-min=10.4 -arch i386"
-    SO_EXT=dylib
-    SO_CFLAGS=
+    LFLAGS=""
+    SO_EXT="dylib"
+    SO_CFLAGS=""
     SO_LFLAGS='-dynamiclib -Wl,-install_name,`basename $@`'
-    JSCORE_CFLAGS=
+    JSCORE_CFLAGS="-framework JavaScriptCore"
     JSCORE_LFLAGS="-framework JavaScriptCore"
-    WEBKIT_CFLAGS="-DWEBKIT -x objective-c"
-    WEBKIT_LFLAGS="-framework Foundation -framework WebKit -framework JavaScriptCore"
-
-    if [ -d "frameworks" ]; then
-        echo "Looking for frameworks in ./frameworks"
-        LFLAGS="$LFLAGS -F./frameworks"
-    fi
+    ICONV_CFLAGS=""
+    ICONV_LFLAGS="-liconv"
 
 elif pkg-config --version >/dev/null 2>&1; then
 
-    echo "Configuring with pkg-config"
-
-    for config in webkitgtk-3.0 webkit-3.0 webkitgtk-1.0 webkit-1.0;
-    do
-        if pkg-config --modversion $config >/dev/null 2>&1; then
-            echo "Found $config"
-            PLATFORM=$config
-            JSCORE_CFLAGS=`pkg-config --cflags $config`
-            JSCORE_LFLAGS=`pkg-config --libs $config`
-            WEBKIT_CFLAGS="-DWEBKIT_GTK ${JSCORE_CFLAGS}"
-            WEBKIT_LFLAGS=${JSCORE_LFLAGS}
+    for pkg in webkitgtk-3.0 webkit-3.0 webkitgtk-1.0 webkit-1.0; do
+        if pkg-config --modversion "$pkg" >/dev/null 2>&1; then
+            PLATFORM="gtk"
+            JSCORE_CFLAGS=`pkg-config --cflags $pkg`
+            JSCORE_LFLAGS=`pkg-config --libs $pkg`
             break
         fi
-
-        if [ "$PLATFORM" = "unknown" ]; then
-            echo
-            echo "ERROR: can't find webkit on your system!"
-            echo
-            echo "On Debian-based systems, try: apt-get install libwebkitgtk-3.0-dev"
-            echo
-            echo "If that doesn't work, try: pkg-config --list-all | grep webkit"
-            echo "and add it to list of configs here"
-            echo
-            exit 1
-        fi
     done
+
+fi
+
+check_header () {
+    echo "#include <$1>" | "$CC" -E -x c /dev/stdin $JSCORE_CFLAGS >/dev/null 2>&1
+}
+
+echo "Platform: $PLATFORM"
+
+if check_header "JavaScriptCore/JavaScript.h"; then
+	echo "JSC header: JavaScriptCore/JavaScript.h"
+    JSCORE_CFLAGS="$JSCORE_CFLAGS -DUSE_JAVASCRIPT_H"
+elif check_header "JavaScriptCore/JavaScriptCore.h"; then
+	echo "JSC header: JavaScriptCore/JavaScriptCore.h"
+    JSCORE_CFLAGS="$JSCORE_CFLAGS -DUSE_JAVASCRIPTCORE_H"
 else
-
-    echo "Guessing config... this probably won't work!"
-
-    PLATFORM=generic
-    JSCORE_CFLAGS=-I/usr/local/include/webkit
-    JSCORE_LFLAGS=-L/usr/local/lib -lwebkit
-    WEBKIT_CFLAGS=${JSCORE_CFLAGS}
-    WEBKIT_LFLAGS=${JSCORE_LFLAGS}
+	echo "Warning: no JavaScriptCore found." 1>&2
 fi
 
-
-echo "#include <JavaScriptCore/JavaScript.h>" > .check_JavaScript_h.h
-#if gcc -E .check_JavaScript_h.h -framework JavaScriptCore &>/dev/null; then
-if ${CC} ${JSCORE_CFLAGS} ${JSCORE_LIBS} -E .check_JavaScript_h.h  >/dev/null 2>&1; then
-	echo '#define HAVE_JAVASCRIPT_H 1' > include/config.h
-	echo 'Detected <JavaScriptCore/JavaScript.h>'
-else 
-	echo '#ifdef HAVE_JAVASCRIPT_H' >  include/config.h
-	echo '#undef HAVE_JAVASCRIPT_H' >> include/config.h
-	echo '#endif' >> include/config.h
-	echo 'No <JavaScriptCore/JavaScript.h> detected. Using <JavaScriptCore/JavaScriptCore.h> instead.'
+if check_header "editline/readline.h"; then
+	echo "Line editing lib: editline"
+    READLINE_CFLAGS="-DUSE_EDITLINE"
+    READLINE_LFLAGS="-ledit"
+elif check_header "readline/readline.h"; then
+	echo "Line editing lib: readline"
+    READLINE_CFLAGS="-DUSE_READLINE"
+    READLINE_LFLAGS="-lreadline"
+else
+	echo "Warning: no line editing lib found." 1>&2
 fi
-rm -f .check_JavaScript_h.h
 
-echo "writing config.mk"
-echo PLATFORM=${PLATFORM} > config.mk
-for flag in CC CPP CFLAGS LFLAGS \
-     SO_EXT SO_CFLAGS SO_LFLAGS \
-     JSCORE_CFLAGS JSCORE_LFLAGS \
-     WEBKIT_CFLAGS WEBKIT_LFLAGS;
-do
-    eval "value=\${${flag}}"
-    echo "${flag}=${value}" >> config.mk
+rm -f "$CONFIG_MK"
+for flag in $CONFIG_FLAGS; do
+    echo "$flag=$(eval "echo \$$flag")" >> "$CONFIG_MK"
 done
 
-exit 0
+echo "Ok!"

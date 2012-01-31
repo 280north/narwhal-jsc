@@ -42,7 +42,7 @@ FUNCTION(INTERPRETER_JSGlobalContextCreate)
 {
     JSGlobalContextRef new_context;
 
-#ifdef HAVE_JAVASCRIPT_H
+#ifdef USE_JAVASCRIPT_H
     new_context = JSGlobalContextCreateInGroup(JSContextGetGroup(_context), NULL);
 #else
     new_context = JSGlobalContextCreate(NULL);

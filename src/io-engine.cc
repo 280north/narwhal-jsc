@@ -97,8 +97,11 @@ FUNCTION(IO_writeInto, ARG_OBJ(buffer), ARG_INT(from), ARG_INT(to))
     if (offset < 0 || from < 0 || (offset + to) > bytes->length)
         THROW("Tried to write out of range.");
     
-    write(fd, bytes->buffer + (offset + from), (to - from));
-    
+	ssize_t wrote = write(fd, bytes->buffer + (offset + from), (to - from));
+	if (wrote < 0) {
+		THROW("Error writing.");
+	}
+
     return JS_undefined;
 }
 END
@@ -255,7 +258,7 @@ FUNCTION(TextInputStream_read)
             d->inBufferUsed = inLeft;
             
             outBufferUsed = outBufferSize - outLeft;
-            if (outBufferUsed != (out - outBuffer)) printf("sanity check failed: %d %d\n", outBufferUsed, (out - outBuffer));
+            if (outBufferUsed != (out - outBuffer)) printf("sanity check failed: %u %u\n", (unsigned int)outBufferUsed, (unsigned int)(out - outBuffer));
         } else if (errno == EILSEQ) {
             // TODO: gracefully handle this case.
             // Illegal character or shift sequence

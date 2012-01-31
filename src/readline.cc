@@ -1,12 +1,10 @@
 #include <narwhal.h>
 
-#ifdef USE_READLINE
-#include <readline/history.h>
-#include <readline/readline.h>
-#endif
-
 #ifdef USE_EDITLINE
 #include <editline/readline.h>
+#elif USE_READLINE
+#include <readline/history.h>
+#include <readline/readline.h>
 #endif
 
 FUNCTION(READLINE_readline)
